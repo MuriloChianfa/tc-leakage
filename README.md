@@ -1,7 +1,7 @@
 <h1 align="center">Traffic Control Packet Leakage</h1>
 
 
-![TX-Path](images/tx-path.png)
+<div align="center"><img src="images/tx-path.png" /></div>
 
 ### eBPF-based Egress Packet Redirection with Traffic Control (TC).
 
@@ -173,38 +173,43 @@ sudo tcpdump -pni any dst 8.8.8.8
 
 Example of the output logs:
 
-<small>
-
 > Before load eBPF program
 
+<small>
 enp2s0 Out IP 192.168.0.10 > 8.8.8.8: ICMP echo request, id 65392, seq 4, length 64
+</small>
 </br>
+<small>
 enp2s0 Out IP 192.168.0.10 > 8.8.8.8: ICMP echo request, id 65392, seq 4, length 64
+</small>
 </br>
 
 > After load eBPF program
 
+<small>
 ppp0 Out IP 100.64.0.10 > 8.8.8.8: ICMP echo request, id 65392, seq 4, length 64
+</small>
 </br>
+<small>
 ppp0 Out IP 100.64.0.10 > 8.8.8.8: ICMP echo request, id 65392, seq 4, length 64
 </small>
 
 ## eBPF Kernel Tracing Pipe
 
 <small>
-ping-131285  [005] b..4. 59020.471543: bpf_trace_printk: TC Redirect: Found ifindex 9 for PID 131285</small>
+ping-131285  [05] b..4. 59.43: bpf_trace_printk: TC Redirect: Found ifindex 9 for PID 131285</small>
 <br>
-<small>ping-131285  [005] b..4. 59020.471543: bpf_trace_printk: TC Redirect: Found ifindex 9 for PID 131285</small>
+<small>ping-131285  [05] b..4. 59.43: bpf_trace_printk: TC Redirect: Found ifindex 9 for PID 131285</small>
 <br>
-<small>Compositor-102896  [005] b.s2. 59020.478964: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 102896</small>
+<small>Compositor [05] b.s2. 59.64: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 128</small>
 <br>
-<small>Socket Thread-102843  [000] b..1. 59020.487719: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 102843</small>
+<small>Thread-128  [00] b..1. 59.19: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 1028</small>
 <br>
-<small>Socket Thread-102843  [001] b..1. 59020.522779: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 102843</small>
+<small>Thread-128  [01] b..1. 59.79: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 1028</small>
 <br>
-<small>MediaPD~oder #1-130227  [005] b.s2. 59020.523470: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 130227</small>
+<small>Media#132  [05] b.s2. 59.70: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 1302</small>
 <br>
-<small>Socket Thread-102843  [000] b..1. 59020.523700: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 102843</small>
+<small>Thread-128  [00] b..1. 59.33: bpf_trace_printk: TC Pass: No mapping found for PID or TGID 1028</small>
 
 ## Troubleshooting
 
