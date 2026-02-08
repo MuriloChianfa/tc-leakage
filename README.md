@@ -1,32 +1,70 @@
-# netleak
+<h1 align="center">netleak</h1>
 
-**cgroup-based eBPF per-process traffic redirection**
+<p align="center">
+  A kernel-level, proxychains-like tool for per-process traffic redirection on Linux.<br><br>
+  Built on top of <strong>cgroup v2</strong> and <strong>eBPF</strong>, netleak forces all network traffic from a process
+  and its entire child tree through a specific network interface, completely
+  transparently to the application. If the target interface goes down, a
+  kernel-enforced <strong>kill-switch</strong> drops every packet instead of falling back to the
+  default route, guaranteeing zero traffic leakage under any failure condition.
+</p>
 
-A proxychains-like tool at kernel level: route all traffic from a process (and its children) through an arbitrary network interface, with kill-switch semantics that drop packets instead of leaking when the interface goes down.
+---
 
-## Prerequisites
+## Install from Package
 
-- Linux kernel >= 5.8 (cgroup v2, cgroup-skb eBPF)
-- cgroup v2 mounted at `/sys/fs/cgroup` (default on modern distros)
-- `clang` and `llvm` >= 10
-- `golang` >= 1.24
-- `libbpf-dev`
-- `make`
+<details name="install" open>
+  <summary style="font-size: 16px;"><strong>Ubuntu/Debian</strong></summary>
 
-### Installing Dependencies
+  Download the `.deb` package from the [latest release](https://github.com/MuriloChianfa/netleak/releases/latest) and install it:
 
-```bash
-sudo apt update
-sudo apt install -y clang llvm libbpf-dev libelf-dev make golang
-```
+  ```bash
+  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/netleak_1.0.0_amd64.deb
+  sudo dpkg -i netleak_1.0.0_amd64.deb
+  ```
+</details>
+<details name="install">
+  <summary style="font-size: 16px;"><strong>Fedora/RHEL/Rocky/AlmaLinux</strong></summary>
 
-## Building
+  Download the `.rpm` package from the [latest release](https://github.com/MuriloChianfa/netleak/releases/latest) and install it:
 
-```bash
-git clone git@github.com:MuriloChianfa/netleak.git
-cd netleak
-make
-```
+  ```bash
+  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/netleak-1.0.0-1.x86_64.rpm
+  sudo rpm -i netleak-1.0.0-1.x86_64.rpm
+  ```
+</details>
+
+## Or Build & Install from Source
+
+**Requirements:** Linux kernel >= 5.8, cgroup v2, clang/llvm >= 10, Go >= 1.24
+
+<details name="build-source" open>
+  <summary style="font-size: 16px;"><strong>Ubuntu/Debian</strong></summary>
+
+  ```bash
+  # Install build dependencies
+  sudo apt update
+  sudo apt install -y clang llvm libbpf-dev libelf-dev make golang
+
+  # Clone and build
+  git clone https://github.com/MuriloChianfa/netleak.git
+  cd netleak
+  make
+  ```
+</details>
+<details name="build-source">
+  <summary style="font-size: 16px;"><strong>Fedora/RHEL/Rocky Linux</strong></summary>
+
+  ```bash
+  # Install build dependencies
+  sudo dnf install -y clang llvm libbpf-devel elfutils-libelf-devel make golang
+
+  # Clone and build
+  git clone https://github.com/MuriloChianfa/netleak.git
+  cd netleak
+  make
+  ```
+</details>
 
 ## Usage
 
@@ -50,51 +88,6 @@ sudo netleak wg0 bash
 
 > Everything launched from that shell (and its children*), will have traffic routed through `wg0`.
 
-### Verify
-
-```bash
-# This should show the IP of the target interface
-sudo netleak ppp0 curl ifconfig.me
-
-# Other system processes remain unaffected
-curl ifconfig.me  # shows your real IP
-```
-
-## Architecture
-
-```
-                    ┌─────────────────────────────┐
-                    │         netleak CLI          │
-                    │  - create cgroup v2          │
-                    │  - load BPF programs         │
-                    │  - setup policy routing      │
-                    │  - monitor target interface  │
-                    └──────────┬──────────────────┘
-                               │ fork + exec
-                    ┌──────────▼──────────────────┐
-                    │     target command           │
-                    │  (inherits cgroup)           │
-                    └──────────┬──────────────────┘
-                               │ egress packet
-                    ┌──────────▼──────────────────┐
-                    │  eBPF (cgroup/sock_create)   │
-                    │  sk->mark = fwmark           │
-                    │                              │
-                    │  eBPF (cgroup_skb/egress)    │
-                    │  if kill_switch → DROP        │
-                    └──────────┬──────────────────┘
-                               │ fwmark routing
-                    ┌──────────▼──────────────────┐
-                    │   Policy Routing Table 100   │
-                    │   default dev <interface>    │
-                    └─────────────────────────────┘
-```
-
-### BPF Map
-
-| Key (u64)  | Value                          |
-|------------|--------------------------------|
-| cgroup_id  | `{ fwmark: u32, flags: u32 }`  |
 
 ### Kill-Switch
 
@@ -106,17 +99,24 @@ When the target interface goes down:
 
 When the interface comes back up, the flag is cleared and traffic resumes.
 
-## Security
-
-- Root privileges required (eBPF + cgroups + routing)
-- No fallback routing under any failure condition
-- No source address spoofing is needed
-
 ## Verifying Binary Signatures
 
 netleak binaries are cryptographically signed with GPG for authenticity verification. To verify a downloaded binary:
 
-### 1. Import the Public Key
+### 1. Verify Checksums
+
+Download the checksum file and verify the integrity of your package:
+
+```bash
+# Download checksums and signature
+curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS
+curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS.asc
+
+# Verify the package checksum
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+### 2. Import the Public Key
 
 Import the maintainer's public key directly from the keyserver using the key fingerprint:
 
@@ -148,7 +148,14 @@ gpg: Total number processed: 1
 gpg:               imported: 1
 ```
 
-### 2. Verify the Signature
+### 3. Verify the GPG Signature
+
+Verify both the checksums file signature and the package signature:
+
+```bash
+# Verify the checksums signature
+gpg --verify SHA256SUMS.asc SHA256SUMS
+```
 
 Assuming you have downloaded both the binary package (e.g., `netleak_1.0.0_amd64.deb`) and its signature file (e.g., `netleak_1.0.0_amd64.deb.asc`):
 
@@ -165,33 +172,17 @@ gpg: Good signature from "MuriloChianfa <murilo.chianfa@outlook.com>"
 
 If you see "BAD signature", **do not use** the binary - it may have been tampered with or corrupted.
 
-### 3. Verify Checksums (Additional Layer)
+## Security
 
-For extra security, you can also verify the checksums:
-
-```bash
-# Download checksums and signature
-curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS
-curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS.asc
-
-# Verify the checksums signature
-gpg --verify SHA256SUMS.asc SHA256SUMS
-
-# Verify the package checksum
-sha256sum -c SHA256SUMS --ignore-missing
-```
-
-## Non-Goals
-
-- No network namespace isolation
-- No container runtime integration
-- No raw AF_PACKET injection support
+For details on reporting vulnerabilities and our security practices, see the [Security Policy](https://github.com/MuriloChianfa/netleak/security/policy).
 
 ## License
 
-This project uses dual licensing:
+This project is dual-licensed:
 
-- **Go source code** (`cmd/`): [MIT License](LICENSE)
-- **eBPF/C source code** (`bpf/`): [GPL-3.0](LICENSE-GPL)
+| Component | License | File |
+|---|---|---|
+| Go source | MIT | [LICENSE](LICENSE) |
+| eBPF/C source | GPL-3.0-only | [LICENSE-GPL](LICENSE-GPL) |
 
-Each source file contains an SPDX license identifier header indicating its applicable license.
+Each source file contains an SPDX license identifier header.
