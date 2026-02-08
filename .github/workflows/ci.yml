@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-matrix:
+    name: Build (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Ubuntu 22.04
+            image: ubuntu:22.04
+            pkg_manager: apt
+          - distro: Ubuntu 24.04
+            image: ubuntu:24.04
+            pkg_manager: apt
+          - distro: Debian 12
+            image: debian:12
+            pkg_manager: apt
+          - distro: Debian 13
+            image: debian:trixie
+            pkg_manager: apt
+          - distro: Fedora 40
+            image: fedora:40
+            pkg_manager: dnf
+
+    steps:
+      - name: Install git
+        run: |
+          if [ "${{ matrix.pkg_manager }}" = "apt" ]; then
+            apt-get update && apt-get install -y git
+          else
+            dnf install -y git
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (apt)
+        if: matrix.pkg_manager == 'apt'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y \
+            clang llvm libbpf-dev libelf-dev \
+            make golang ca-certificates
+
+      - name: Install dependencies (dnf)
+        if: matrix.pkg_manager == 'dnf'
+        run: |
+          dnf install -y \
+            clang llvm libbpf-devel elfutils-libelf-devel \
+            make golang ca-certificates
+
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd
+
+      - name: Verify artifacts
+        run: |
+          ls -lh netleak bpf/netleak.o
+          test -x netleak
+          test -f bpf/netleak.o
+
+      - name: Run unit tests
+        run: |
+          cd tests/unit
+          go test -v ./...
+        continue-on-error: true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Go vet
+        run: go vet ./cmd/...
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Staticcheck
+        run: staticcheck ./cmd/...

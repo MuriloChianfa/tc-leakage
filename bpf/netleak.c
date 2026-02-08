@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2024-2026 MuriloChianfa
+
 #include "netleak.h"
 
 /*

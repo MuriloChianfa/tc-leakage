@@ -1,0 +1,145 @@
+name: Packaging
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.0, v1.2.0)'
+        required: true
+
+jobs:
+  version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+  deb:
+    name: DEB (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    needs: version
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu-22.04
+            image: ubuntu:22.04
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+          - distro: debian-12
+            image: debian:12
+          - distro: debian-13
+            image: debian:trixie
+
+    steps:
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y \
+            git clang llvm libbpf-dev libelf-dev \
+            make golang ca-certificates \
+            dpkg-dev fakeroot
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make all
+
+      - name: Build DEB package
+        run: |
+          PKG_DIR="$(pwd)/netleak_${{ needs.version.outputs.version }}_amd64"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/lib/netleak"
+          mkdir -p "${PKG_DIR}/DEBIAN"
+
+          cp netleak "${PKG_DIR}/usr/bin/"
+          cp bpf/netleak.o "${PKG_DIR}/usr/lib/netleak/"
+
+          # Generate control file from template
+          sed "s/{{VERSION}}/${{ needs.version.outputs.version }}/g" \
+            pkg/deb/DEBIAN/control > "${PKG_DIR}/DEBIAN/control"
+
+          cp pkg/deb/DEBIAN/postinst "${PKG_DIR}/DEBIAN/postinst"
+          cp pkg/deb/DEBIAN/prerm "${PKG_DIR}/DEBIAN/prerm"
+          chmod 755 "${PKG_DIR}/DEBIAN/postinst" "${PKG_DIR}/DEBIAN/prerm"
+
+          dpkg-deb --build "${PKG_DIR}"
+
+      - name: Verify DEB package
+        run: dpkg-deb --info "netleak_${{ needs.version.outputs.version }}_amd64.deb"
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netleak-${{ matrix.distro }}.deb
+          path: "*.deb"
+
+  rpm:
+    name: RPM (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    needs: version
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: fedora-40
+            image: fedora:40
+
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y \
+            git clang llvm libbpf-devel elfutils-libelf-devel \
+            make golang ca-certificates \
+            rpm-build
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make all
+
+      - name: Setup RPM build tree
+        run: |
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/bin
+          mkdir -p ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/lib/netleak
+
+          cp netleak ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/bin/
+          cp bpf/netleak.o ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/lib/netleak/
+
+      - name: Build RPM package
+        run: |
+          rpmbuild -bb \
+            --define "version ${{ needs.version.outputs.version }}" \
+            --define "release 1" \
+            --define "_topdir $HOME/rpmbuild" \
+            --buildroot "$HOME/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64" \
+            pkg/rpm/netleak.spec
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netleak-${{ matrix.distro }}.rpm
+          path: ~/rpmbuild/RPMS/**/*.rpm

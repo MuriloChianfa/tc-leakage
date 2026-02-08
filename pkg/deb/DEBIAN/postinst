@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+# Ensure BPF filesystem is mounted
+if ! mountpoint -q /sys/fs/bpf 2>/dev/null; then
+    echo "netleak: mounting BPF filesystem at /sys/fs/bpf"
+    mount -t bpf bpf /sys/fs/bpf || true
+fi
+
+# Ensure cgroup v2 is available
+if ! mountpoint -q /sys/fs/cgroup 2>/dev/null; then
+    echo "netleak: WARNING - cgroup v2 filesystem not mounted at /sys/fs/cgroup"
+    echo "netleak: please ensure cgroup v2 is enabled in your kernel"
+fi
+
+#DEBHELPER#
+
+exit 0

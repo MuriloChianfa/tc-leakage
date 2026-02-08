@@ -1,0 +1,417 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["Packaging"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    environment: release
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Determine version from tag
+        id: version
+        run: |
+          # Get the tag that triggered the packaging workflow
+          git fetch --tags
+          TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+          if [ -z "$TAG" ]; then
+            echo "Error: No tag found on this commit"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
+
+      - name: Organize artifacts
+        run: |
+          mkdir -p release
+          
+          # Find and copy DEB packages
+          find artifacts -name "*.deb" -exec cp {} release/ \;
+          
+          # Find and copy RPM packages
+          find artifacts -name "*.rpm" -exec cp {} release/ \;
+          
+          ls -lah release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          # Generate checksums only for packages (not checksum files themselves)
+          sha256sum *.deb *.rpm 2>/dev/null | tee SHA256SUMS
+          sha512sum *.deb *.rpm 2>/dev/null | tee SHA512SUMS
+
+      # SECURITY: GPG signing in isolated step with proper secret handling
+      # The secret is only accessed here, not in conditions or other steps
+      - name: Sign artifacts with GPG
+        id: gpg_sign
+        env:
+          # SECURITY: Pass secrets through environment variables, not directly in script
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          # Check if GPG key is configured (without exposing the secret)
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "GPG signing skipped - no key configured"
+            echo "gpg_signed=false" >> $GITHUB_OUTPUT
+            echo "gpg_fingerprint=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Importing GPG key..."
+          
+          # SECURITY: Import key with restricted permissions
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          
+          # Import the key and capture the key ID from the import output
+          # SECURITY: Redirect to variable without echoing to logs
+          IMPORT_OUTPUT=$(echo "$GPG_PRIVATE_KEY" | gpg --batch --import 2>&1)
+          
+          # Extract the key ID from the import output
+          KEY_ID=$(echo "$IMPORT_OUTPUT" | grep -oP 'key \K[A-F0-9]{16}' | head -1)
+
+          # Verify the import was successful by checking for any keys
+          if ! gpg --list-keys >/dev/null 2>&1; then
+            echo "::error::Failed to import GPG key - no keys found"
+            exit 1
+          fi
+          
+          echo "GPG key imported successfully"
+          
+          # Get the key fingerprint for verification
+          # Use --with-colons format which is the most reliable machine-readable format
+          # Try secret keys first, but fall back to public keys if needed
+          FINGERPRINT=$(gpg --list-secret-keys --with-colons 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')
+
+          # If no secret keys listed, try public keys (happens with some GPG configurations)
+          if [ -z "$FINGERPRINT" ]; then
+            FINGERPRINT=$(gpg --list-keys --with-colons 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')
+          fi
+
+          # Try getting the key ID from sec line
+          if [ -z "$FINGERPRINT" ]; then
+            FINGERPRINT=$(gpg --list-secret-keys --with-colons 2>/dev/null | awk -F: '/^sec:/ {print $5; exit}')
+          fi
+
+          # Try getting the key ID from pub line
+          if [ -z "$FINGERPRINT" ]; then
+            FINGERPRINT=$(gpg --list-keys --with-colons 2>/dev/null | awk -F: '/^pub:/ {print $5; exit}')
+          fi
+
+          # Last resort: extract from --fingerprint output
+          if [ -z "$FINGERPRINT" ]; then
+            FINGERPRINT=$(gpg --list-keys --fingerprint 2>/dev/null | grep -A1 "^pub" | grep -v "^pub" | grep -v "^uid" | tr -d ' ' | head -1)
+          fi
+          
+          # If we couldn't extract the fingerprint but got key ID from import, use that
+          if [ -z "$FINGERPRINT" ] && [ -n "$KEY_ID" ]; then
+            FINGERPRINT="$KEY_ID"
+          fi
+          
+          if [ -z "$FINGERPRINT" ]; then
+            echo "::error::Failed to extract GPG key fingerprint"
+            # SECURITY: Do not run debug commands that could expose key info
+            exit 1
+          fi
+          
+          echo "GPG key fingerprint: $FINGERPRINT"
+          
+          # For signing, prefer the key ID from import output if available
+          SIGNING_KEY="${KEY_ID:-$FINGERPRINT}"
+          echo "Using key for signing: $SIGNING_KEY"
+          echo "gpg_fingerprint=$FINGERPRINT" >> $GITHUB_OUTPUT
+          
+          # Configure GPG for non-interactive signing
+          echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
+          gpg-connect-agent reloadagent /bye 2>/dev/null || true
+          
+          # Sign all packages (only .deb and .rpm for this repository)
+          SIGN_COUNT=0
+          find release -type f \( -name "*.deb" -o -name "*.rpm" \) | while read f; do
+            echo "Signing: $f"
+            if [ -n "$GPG_PASSPHRASE" ]; then
+              echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "$SIGNING_KEY" --armor --detach-sign "$f"
+            else
+              gpg --batch --yes --default-key "$SIGNING_KEY" --armor --detach-sign "$f"
+            fi
+            SIGN_COUNT=$((SIGN_COUNT + 1))
+          done
+          
+          echo "Signed $SIGN_COUNT files"
+          echo "gpg_signed=true" >> $GITHUB_OUTPUT
+          
+          # SECURITY: Clean up GPG home directory
+          # The key material is removed after signing
+          rm -rf "$GNUPGHOME"
+          echo "GPG keyring cleaned up"
+
+      # SECURITY: Sign checksums in separate step with same isolated GPG handling
+      - name: Sign checksums with GPG
+        if: steps.gpg_sign.outputs.gpg_signed == 'true'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          # Re-import key for checksum signing (previous GNUPGHOME was cleaned up)
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import 2>&1
+
+          # Verify the import was successful
+          if ! gpg --list-secret-keys >/dev/null 2>&1; then
+            echo "::error::Failed to re-import GPG key"
+            exit 1
+          fi
+
+          echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
+          gpg-connect-agent reloadagent /bye 2>/dev/null || true
+          
+          cd release
+          
+          if [ -n "$GPG_PASSPHRASE" ]; then
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign SHA256SUMS
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign SHA512SUMS
+          else
+            gpg --batch --yes --armor --detach-sign SHA256SUMS
+            gpg --batch --yes --armor --detach-sign SHA512SUMS
+          fi
+          
+          echo "Checksum files signed"
+          
+          # SECURITY: Clean up
+          rm -rf "$GNUPGHOME"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          RELEASE_URL="${REPO_URL}/releases/download/${TAG}"
+          GHCR_IMAGE="ghcr.io/${{ github.repository }}"
+          
+          cat > release_notes.md << 'RELEASE_NOTES_EOF'
+          A proxychains-like tool at kernel level: route all traffic from a process (and its children) through an arbitrary network interface, with kill-switch semantics that drop packets instead of leaking when the interface goes down.
+          
+          **Key features:**
+          - eBPF-based per-process traffic redirection using cgroup v2
+          - Kill-switch: drops packets if target interface goes down (no leaks)
+          - Policy routing with fwmark for clean traffic isolation
+          - Perfect for VPN fail-safe, per-app routing and testing
+          
+          ## 📦 Installation
+          
+          Choose the installation method that best fits your environment.
+          
+          ### Native Packages
+          
+          | Distribution | Package | Installation |
+          |-------------|---------|--------------|
+          RELEASE_NOTES_EOF
+          
+          # Add DEB packages
+          for deb in release/*.deb; do
+            if [ -f "$deb" ]; then
+              filename=$(basename "$deb")
+              distro=$(echo "$filename" | grep -oE 'ubuntu-[0-9]+\.[0-9]+|debian-[0-9]+' || echo "")
+              if [ -n "$distro" ]; then
+                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) | \`sudo dpkg -i ${filename}\` |" >> release_notes.md
+              fi
+            fi
+          done
+          
+          # Add RPM packages
+          for rpm in release/*.rpm; do
+            if [ -f "$rpm" ]; then
+              filename=$(basename "$rpm")
+              distro=$(echo "$filename" | grep -oE 'fedora-[0-9]+' || echo "")
+              if [ -n "$distro" ]; then
+                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) | \`sudo rpm -i ${filename}\` |" >> release_notes.md
+              fi
+            fi
+          done
+          
+          cat >> release_notes.md << RELEASE_NOTES_EOF
+          
+          ### Container Image
+          
+          Pull the Docker image from GitHub Container Registry:
+          
+          \`\`\`bash
+          # Pull latest stable release
+          docker pull ${GHCR_IMAGE}:latest
+          
+          # Pull specific version
+          docker pull ${GHCR_IMAGE}:${VERSION}
+          
+          # Run netleak in a container (requires privileged mode)
+          docker run --privileged \\
+            --cgroupns=host \\
+            -v /sys/fs/bpf:/sys/fs/bpf \\
+            -v /sys/fs/cgroup:/sys/fs/cgroup \\
+            ${GHCR_IMAGE}:${VERSION} --help
+          \`\`\`
+          
+          **Available tags:**
+          - \`latest\` - Latest stable release
+          - \`${VERSION}\` - This specific version
+          - \`${VERSION%.*}\` - Minor version (e.g., 1.2.x)
+          - \`${VERSION%%.*}\` - Major version (e.g., 1.x.x)
+          
+          ## 🔒 Verification
+          
+          All artifacts include SHA256 and SHA512 checksums for integrity verification, and are cryptographically signed with GPG for authenticity.
+          
+          ### Verify GPG Signatures
+          
+          \`\`\`bash
+          # Import the maintainer's public key
+          gpg --keyserver keys.openpgp.org --recv-keys 3E1A1F401A1C47BC77D1705612D0D82387FC53B0
+          
+          # Download a package and its signature
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb.asc
+          
+          # Verify the signature
+          gpg --verify netleak_${VERSION}_amd64.deb.asc netleak_${VERSION}_amd64.deb
+          \`\`\`
+          
+          ### Verify Package Checksums
+          
+          \`\`\`bash
+          # Download the checksums file and its signature
+          curl -LO ${RELEASE_URL}/SHA256SUMS
+          curl -LO ${RELEASE_URL}/SHA256SUMS.asc
+          
+          # Verify the signature on the checksums
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          
+          # Download a package (example)
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb
+          
+          # Verify the checksum
+          sha256sum -c SHA256SUMS --ignore-missing
+          \`\`\`
+          
+          ### Verify Container Image
+          
+          \`\`\`bash
+          # Get the image digest
+          docker pull ${GHCR_IMAGE}:${VERSION}
+          docker inspect ${GHCR_IMAGE}:${VERSION} | grep -A 10 RepoDigests
+          \`\`\`
+          
+          ## 📚 Quick Start
+          
+          After installation, use netleak to route process traffic through specific interfaces:
+          
+          \`\`\`bash
+          # Route curl through a VPN interface
+          sudo netleak wg0 curl ifconfig.me
+          
+          # Run a shell with all traffic through ppp0
+          sudo netleak ppp0 bash
+          
+          # Everything launched from that shell uses ppp0
+          curl ifconfig.me  # shows ppp0's IP
+          
+          # Other system processes remain unaffected
+          exit  # leave the netleak shell
+          curl ifconfig.me  # shows your real IP
+          \`\`\`
+          
+          **Kill-switch in action:**
+          When the target interface goes down, all packets from the process are dropped (no fallback to default route).
+          
+          ## 📖 Documentation
+          
+          - [Installation Guide](${REPO_URL}/blob/main/README.md#building)
+          - [Usage Examples](${REPO_URL}/blob/main/README.md#usage)
+          - [Architecture](${REPO_URL}/blob/main/README.md#architecture)
+          - [Security](${REPO_URL}/blob/main/README.md#security)
+          
+          ## 🐛 Known Issues
+          
+          - Requires Linux kernel 5.8+ with eBPF and cgroup v2 support
+          - Requires root privileges (eBPF + cgroups + routing)
+          - Container mode requires \`--privileged\` and \`--cgroupns=host\`
+          
+          ## ⚠️ Use Cases
+          
+          - **VPN fail-safe**: Prevent IP leaks when VPN disconnects
+          - **Per-app routing**: Route specific applications through different interfaces
+          - **Testing**: Verify application behavior with different network paths
+          - **Privacy**: Ensure critical apps never use the default route
+          
+          RELEASE_NOTES_EOF
+          
+          # Set output for use in release step
+          echo "notes_file=release_notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.tag }}
+            type=raw,value=latest,enable=${{ !contains(steps.version.outputs.tag, '-') }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: netleak ${{ steps.version.outputs.tag }}
+          body_path: ${{ steps.release_notes.outputs.notes_file }}
+          draft: true
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+          files: release/*
+          append_body: true
+          generate_release_notes: true

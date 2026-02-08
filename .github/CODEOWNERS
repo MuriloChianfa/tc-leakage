@@ -1,0 +1,17 @@
+# Default owner for everything in the repository
+* @MuriloChianfa
+
+# BPF/eBPF source code
+/bpf/ @MuriloChianfa
+
+# Go source code
+/cmd/ @MuriloChianfa
+
+# Tests
+/tests/ @MuriloChianfa
+
+# CI/CD and GitHub configuration
+/.github/ @MuriloChianfa
+
+# Packaging
+/pkg/ @MuriloChianfa

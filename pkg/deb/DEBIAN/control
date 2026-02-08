@@ -1,0 +1,18 @@
+Package: netleak
+Version: {{VERSION}}
+Architecture: amd64
+Maintainer: MuriloChianfa <murilo.chianfa@outlook.com>
+Depends: libbpf0 | libbpf1, libelf1
+Section: net
+Priority: optional
+Homepage: https://github.com/MuriloChianfa/netleak
+Description: cgroup-based eBPF per-process traffic redirection
+ Route all traffic from a process (and its children) through an arbitrary
+ network interface, with kill-switch semantics that drop packets instead
+ of leaking when the interface goes down.
+ .
+ Features:
+  - Kernel-level proxychains-like behavior using cgroup v2 and eBPF
+  - Kill-switch: drops packets when the target interface is down
+  - No fallback routing under any failure condition
+  - Policy routing via firewall marks

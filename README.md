@@ -112,6 +112,75 @@ When the interface comes back up, the flag is cleared and traffic resumes.
 - No fallback routing under any failure condition
 - No source address spoofing is needed
 
+## Verifying Binary Signatures
+
+netleak binaries are cryptographically signed with GPG for authenticity verification. To verify a downloaded binary:
+
+### 1. Import the Public Key
+
+Import the maintainer's public key directly from the keyserver using the key fingerprint:
+
+```bash
+gpg --keyserver keys.openpgp.org --recv-keys 3E1A1F401A1C47BC77D1705612D0D82387FC53B0
+```
+
+<details>
+<summary><b>Alternative options</b></summary>
+
+Using the shorter key ID:
+
+```bash
+gpg --keyserver keys.openpgp.org --recv-keys 12D0D82387FC53B0
+```
+
+**Alternative keyserver** (if `keys.openpgp.org` is unavailable):
+
+```bash
+gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys 3E1A1F401A1C47BC77D1705612D0D82387FC53B0
+```
+
+</details>
+
+You should see output confirming the key was imported:
+```
+gpg: key 12D0D82387FC53B0: public key "MuriloChianfa <murilo.chianfa@outlook.com>" imported
+gpg: Total number processed: 1
+gpg:               imported: 1
+```
+
+### 2. Verify the Signature
+
+Assuming you have downloaded both the binary package (e.g., `netleak_1.0.0_amd64.deb`) and its signature file (e.g., `netleak_1.0.0_amd64.deb.asc`):
+
+```bash
+gpg --verify netleak_1.0.0_amd64.deb.asc netleak_1.0.0_amd64.deb
+```
+
+If the signature is valid, you should see:
+```
+gpg: Signature made [date and time]
+gpg:                using EDDSA key 3E1A1F401A1C47BC77D1705612D0D82387FC53B0
+gpg: Good signature from "MuriloChianfa <murilo.chianfa@outlook.com>"
+```
+
+If you see "BAD signature", **do not use** the binary - it may have been tampered with or corrupted.
+
+### 3. Verify Checksums (Additional Layer)
+
+For extra security, you can also verify the checksums:
+
+```bash
+# Download checksums and signature
+curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS
+curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/SHA256SUMS.asc
+
+# Verify the checksums signature
+gpg --verify SHA256SUMS.asc SHA256SUMS
+
+# Verify the package checksum
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
 ## Non-Goals
 
 - No network namespace isolation
@@ -120,4 +189,9 @@ When the interface comes back up, the flag is cleared and traffic resumes.
 
 ## License
 
-[MIT License](LICENSE)
+This project uses dual licensing:
+
+- **Go source code** (`cmd/`): [MIT License](LICENSE)
+- **eBPF/C source code** (`bpf/`): [GPL-3.0](LICENSE-GPL)
+
+Each source file contains an SPDX license identifier header indicating its applicable license.

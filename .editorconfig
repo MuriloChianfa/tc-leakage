@@ -1,0 +1,66 @@
+# EditorConfig helps maintain consistent coding styles across different editors
+# and IDEs for the netleak project
+# See: https://editorconfig.org
+
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Go source files
+[*.go]
+indent_style = tab
+indent_size = 4
+max_line_length = 100
+
+# C/BPF source files
+[*.{c,h}]
+indent_style = tab
+indent_size = 4
+max_line_length = 120
+
+# Shell scripts
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+
+# Makefiles require tabs
+[{Makefile,*.mk}]
+indent_style = tab
+indent_size = 4
+
+# YAML files (GitHub Actions, CI/CD)
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown files
+[*.md]
+indent_style = space
+indent_size = 2
+max_line_length = 0
+trim_trailing_whitespace = false
+
+# Docker files
+[{Dockerfile,*.dockerfile}]
+indent_style = space
+indent_size = 4
+
+# RPM spec files
+[*.spec]
+indent_style = space
+indent_size = 4
+
+# Git configuration
+[.git*]
+indent_style = space
+indent_size = 2

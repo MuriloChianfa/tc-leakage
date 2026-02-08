@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+# Clean up any pinned BPF maps from previous sessions
+if [ -d /sys/fs/bpf ]; then
+    rm -f /sys/fs/bpf/cgroup_policy_map 2>/dev/null || true
+fi
+
+# Clean up any leftover netleak cgroups
+if [ -d /sys/fs/cgroup/netleak ]; then
+    rmdir /sys/fs/cgroup/netleak/*/  2>/dev/null || true
+    rmdir /sys/fs/cgroup/netleak     2>/dev/null || true
+fi
+
+#DEBHELPER#
+
+exit 0

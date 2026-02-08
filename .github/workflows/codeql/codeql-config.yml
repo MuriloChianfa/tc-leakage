@@ -1,0 +1,14 @@
+name: "netleak CodeQL config"
+
+paths:
+  - cmd
+  - bpf
+
+paths-ignore:
+  - tests
+  - pkg
+  - '**/*.md'
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality

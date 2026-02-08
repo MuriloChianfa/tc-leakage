@@ -1,0 +1,31 @@
+core:
+  - changed-files:
+      - any-glob-to-any-file: ['cmd/**', 'bpf/**']
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ['tests/**']
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md']
+
+ci/cd:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**']
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file: ['pkg/**']
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file: ['Dockerfile']
+
+build:
+  - changed-files:
+      - any-glob-to-any-file: ['Makefile', 'go.mod', 'go.sum']
+
+security:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/SECURITY.md', '.github/workflows/codeql.yml']

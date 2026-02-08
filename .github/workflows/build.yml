@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev libelf-dev make
+
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd
+
+      - name: Verify artifacts
+        run: |
+          ls -lh netleak bpf/netleak.o
+          file netleak
+          file bpf/netleak.o
+          ./netleak 2>&1 || true
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: netleak-linux-amd64
+          path: |
+            netleak
+            bpf/netleak.o
