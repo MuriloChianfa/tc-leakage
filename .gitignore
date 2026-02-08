@@ -85,7 +85,7 @@ dkms.conf
 *.o
 !*_bpf*.o
 target
-tc-leakage
+netleak
 
 # Test binary, build with `go test -c`
 *.test

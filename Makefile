@@ -1,16 +1,16 @@
-# bpf/Makefile
+ARCH_INCLUDES := /usr/include/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo x86_64-linux-gnu)
 
 BPF_CFLAGS := -O2 -g \
   -target bpf \
-  -Wextra \
-  -I./bpf/ -I/usr/include/bpf
+  -Wall -Wextra \
+  -I/usr/include/bpf \
+  -I$(ARCH_INCLUDES)
 
-BPF_SRCS := bpf/leakage.c
-BPF_OBJS := bpf/leakage.o
-BPF_IF   := enp2s0
-TARGET   := tc-leakage
+BPF_SRCS := bpf/netleak.c
+BPF_OBJS := bpf/netleak.o
+TARGET   := netleak
 
-.PHONY: cmd
+.PHONY: all cmd clean
 
 all: cmd $(BPF_OBJS)
 
@@ -19,14 +19,6 @@ all: cmd $(BPF_OBJS)
 
 cmd:
 	go build -C cmd -o ../$(TARGET)
-
-load:
-	sudo tc qdisc add dev $(BPF_IF) clsact
-	sudo tc filter add dev $(BPF_IF) egress bpf da obj bpf/leakage.o sec tc_egress
-
-unload:
-	sudo tc qdisc delete dev $(BPF_IF) clsact 2>/dev/null
-	sudo tc filter delete dev $(BPF_IF) egress bpf 2>/dev/null
 
 clean:
 	rm -f $(BPF_OBJS)

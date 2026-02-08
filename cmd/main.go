@@ -1,204 +1,149 @@
 package main
 
 import (
-	"bytes"
-	"flag"
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"os/signal"
 	"strconv"
-	"strings"
+	"syscall"
 
-	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
+	"github.com/vishvananda/netlink"
 )
 
-// bpfObjects is a struct that matches the sections in tc_leakage.o:
-//   - Program: tc_leakage
-//   - Map:     PID_IF_MAP
-type bpfObjects struct {
-	XdpPidRedirect  *ebpf.Program `ebpf:"tc_leakage"`
-	PIDInterfaceMap *ebpf.Map     `ebpf:"PID_IF_MAP"`
-}
-
-const mapPinPath = "/sys/fs/bpf/tc/globals/PID_IF_MAP"
-const progPinPath = "/sys/fs/bpf/tc_leakage"
-const bpfObjPath = "bpf/leakage.o"
-
-func usage() {
-	fmt.Fprintf(os.Stderr, `Usage:
-  tc-leakage load --iface <iface>
-      Loads & attaches the eBPF XDP program to <iface> and pins the map.
-
-  tc-leakage set --pid <pid> --redir <iface>
-      Updates the pinned map with (PID -> ifindex) so packets from <pid> redirect to <iface>.
-
-  tc-leakage show
-      Dumps the contents of the pinned map.
-
-  tc-leakage help
-      Shows this help.
-
-Examples:
-  sudo ./tc-leakage load --iface enp2s0
-  sudo ./tc-leakage set --pid 29799 --redir ppp0
-  sudo ./tc-leakage show
-`)
-	os.Exit(1)
-}
+const (
+	fwmark     = 0x4E4C // "NL"
+	routeTable = 100
+)
 
 func main() {
-	if len(os.Args) < 2 {
-		usage()
+	if len(os.Args) < 3 {
+		fmt.Fprintf(os.Stderr, "Usage: netleak <interface> <command> [args...]\n\n")
+		fmt.Fprintf(os.Stderr, "Routes all traffic from <command> (and children) through <interface>.\n")
+		fmt.Fprintf(os.Stderr, "If the interface goes down, traffic is dropped (kill-switch).\n\n")
+		fmt.Fprintf(os.Stderr, "Example:\n")
+		fmt.Fprintf(os.Stderr, "  sudo netleak ppp0 curl ifconfig.me\n")
+		os.Exit(1)
 	}
 
-	cmd := os.Args[1]
-	switch cmd {
-	case "load":
-		loadFlags := flag.NewFlagSet("load", flag.ExitOnError)
-		iface := loadFlags.String("iface", "", "Network interface (e.g. enp2s0) to attach XDP")
-		_ = loadFlags.Parse(os.Args[2:])
-		if *iface == "" {
-			loadFlags.Usage()
-			os.Exit(1)
-		}
+	targetIface := os.Args[1]
+	cmdArgs := os.Args[2:]
 
-		if err := loadAndAttach(*iface); err != nil {
-			log.Fatalf("Load error: %v", err)
-		}
-		fmt.Printf("Loaded & attached XDP to %s successfully\n", *iface)
-
-	case "set":
-		setFlags := flag.NewFlagSet("set", flag.ExitOnError)
-		pid := setFlags.Uint("pid", 0, "PID to match")
-		redir := setFlags.String("redir", "", "Interface name to redirect packets (e.g. eth1)")
-		_ = setFlags.Parse(os.Args[2:])
-		if *pid == 0 || *redir == "" {
-			setFlags.Usage()
-			os.Exit(1)
-		}
-
-		if err := setPidRedirect(uint32(*pid), *redir); err != nil {
-			log.Fatalf("Set error: %v", err)
-		}
-
-	case "show":
-		if err := showMap(); err != nil {
-			log.Fatalf("Show error: %v", err)
-		}
-
-	case "help":
-		usage()
-
-	default:
-		usage()
+	code, err := run(targetIface, cmdArgs)
+	if err != nil {
+		log.Fatalf("netleak: %v", err)
 	}
+	os.Exit(code)
 }
 
-func loadAndAttach(iface string) error {
-	objData, err := os.ReadFile(bpfObjPath)
+func run(targetIface string, cmdArgs []string) (int, error) {
+	// --- Verify target interface exists ---
+	targetLink, err := netlink.LinkByName(targetIface)
 	if err != nil {
-		return fmt.Errorf("reading bpf object file: %w", err)
+		return 1, fmt.Errorf("interface %q: %w", targetIface, err)
 	}
+	log.Printf("Target interface: %s (index %d)", targetIface, targetLink.Attrs().Index)
 
-	rdr := bytes.NewReader(objData)
-
-	spec, err := ebpf.LoadCollectionSpecFromReader(rdr)
+	// --- Create cgroup v2 ---
+	sessionID := strconv.Itoa(os.Getpid())
+	cgPath, err := createCgroup(sessionID)
 	if err != nil {
-		return fmt.Errorf("load collection spec: %w", err)
+		return 1, err
 	}
+	defer cleanupCgroup(cgPath)
+	log.Printf("Cgroup: %s", cgPath)
 
-	var objs bpfObjects
-	if err := spec.LoadAndAssign(&objs, &ebpf.CollectionOptions{
-		Maps: ebpf.MapOptions{
-			PinPath: "/sys/fs/bpf",
-		},
-	}); err != nil {
-		return fmt.Errorf("load and assign: %w", err)
-	}
-
-	ifIndex, err := getIfIndex(iface)
+	// --- Load BPF programs ---
+	objs, err := loadBPF()
 	if err != nil {
-		return fmt.Errorf("getting ifindex: %w", err)
+		return 1, err
 	}
-	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.XdpPidRedirect,
-		Interface: ifIndex,
-		Flags:     link.XDPGenericMode, // link.XDPDriverMode
-	})
+	defer objs.Close()
+
+	// --- Attach BPF programs to cgroup ---
+	sockLink, egressLink, err := attachBPF(objs, cgPath)
 	if err != nil {
-		return fmt.Errorf("attach XDP: %w", err)
+		return 1, err
 	}
+	defer sockLink.Close()
+	defer egressLink.Close()
 
-	err = objs.XdpPidRedirect.Pin(progPinPath)
+	// --- Get cgroup ID ---
+	cgID, err := getCgroupID(cgPath)
 	if err != nil {
-		return fmt.Errorf("pin program: %w", err)
+		return 1, fmt.Errorf("cgroup ID: %w", err)
+	}
+	log.Printf("Cgroup ID: %d", cgID)
+
+	// --- Setup policy routing ---
+	if err := setupRouting(targetLink, fwmark, routeTable); err != nil {
+		return 1, fmt.Errorf("routing: %w", err)
+	}
+	defer cleanupRouting(targetLink, fwmark, routeTable)
+	log.Printf("Policy routing: fwmark 0x%X -> table %d -> dev %s", fwmark, routeTable, targetIface)
+
+	// --- Populate BPF map: cgroup_id -> policy ---
+	pol := policy{Fwmark: uint32(fwmark), Flags: 0}
+	if err := objs.CgroupPolicyMap.Put(cgID, pol); err != nil {
+		return 1, fmt.Errorf("populate map: %w", err)
+	}
+	defer func() {
+		if err := objs.CgroupPolicyMap.Delete(cgID); err != nil {
+			log.Printf("Warning: map cleanup: %v", err)
+		}
+	}()
+
+	// --- Move self into cgroup ---
+	if err := joinCgroup(cgPath, os.Getpid()); err != nil {
+		return 1, fmt.Errorf("join cgroup: %w", err)
 	}
 
-	err = objs.PIDInterfaceMap.Pin(mapPinPath)
-	if err != nil {
-		// If you see "File exists," ensure you remove or unpin it first
-		return fmt.Errorf("pin map: %w", err)
-	}
+	// --- Start interface monitor ---
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go monitorInterface(ctx, targetIface, objs.CgroupPolicyMap, cgID)
 
-	_ = l
-
-	return nil
+	// --- Run target command ---
+	log.Printf("Executing: %v", cmdArgs)
+	return execAndWait(ctx, cancel, cmdArgs)
 }
 
-func setPidRedirect(pid uint32, redirIface string) error {
-	m, err := ebpf.LoadPinnedMap(mapPinPath, nil)
-	if err != nil {
-		return fmt.Errorf("open pinned map: %w", err)
-	}
-	defer m.Close()
+// execAndWait forks the target command, forwards signals, waits for
+// it to exit, and returns its exit code.
+func execAndWait(_ context.Context, cancel context.CancelFunc, cmdArgs []string) (int, error) {
+	child := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	child.Stdin = os.Stdin
+	child.Stdout = os.Stdout
+	child.Stderr = os.Stderr
 
-	ifIndex, err := getIfIndex(redirIface)
-	if err != nil {
-		return fmt.Errorf("getting ifindex: %w", err)
-	}
-
-	err = m.Put(pid, uint32(ifIndex))
-	if err != nil {
-		return fmt.Errorf("map put: %w", err)
+	if err := child.Start(); err != nil {
+		return 1, fmt.Errorf("exec %s: %w", cmdArgs[0], err)
 	}
 
-	fmt.Printf("Set PID %d => ifindex %d\n", pid, ifIndex)
-	return nil
-}
+	// Forward signals to the child process
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range sigCh {
+			_ = child.Process.Signal(sig)
+		}
+	}()
 
-func showMap() error {
-	m, err := ebpf.LoadPinnedMap(mapPinPath, nil)
-	if err != nil {
-		return fmt.Errorf("open pinned map: %w", err)
-	}
-	defer m.Close()
+	// Wait for child to exit
+	waitErr := child.Wait()
+	signal.Stop(sigCh)
+	close(sigCh)
+	cancel()
 
-	var (
-		key   uint32
-		value uint32
-	)
-
-	iter := m.Iterate()
-	for iter.Next(&key, &value) {
-		fmt.Printf("PID %d => ifindex %d\n", key, value)
+	if waitErr != nil {
+		var exitErr *exec.ExitError
+		if errors.As(waitErr, &exitErr) {
+			return exitErr.ExitCode(), nil
+		}
+		return 1, fmt.Errorf("wait: %w", waitErr)
 	}
-	if err := iter.Err(); err != nil {
-		return fmt.Errorf("iterate map: %w", err)
-	}
-	return nil
-}
-
-func getIfIndex(ifaceName string) (int, error) {
-	path := fmt.Sprintf("/sys/class/net/%s/ifindex", ifaceName)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read ifindex: %w", err)
-	}
-	ifIndexStr := strings.TrimSpace(string(data))
-	idx, err := strconv.Atoi(ifIndexStr)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse ifindex: %w", err)
-	}
-	return idx, nil
+	return 0, nil
 }
