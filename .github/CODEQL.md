@@ -113,6 +113,6 @@ paths-ignore:
 For issues with CodeQL analysis:
 
 1. Check the [Actions logs](https://github.com/MuriloChianfa/netleak/actions)
-2. Review [Security alerts](https://github.com/MuriloChianfa/netleak/security/code-scanning)
+2. Review [Security tab](https://github.com/MuriloChianfa/netleak/security)
 3. Open an issue with the `security` label
 4. Contact repository maintainers

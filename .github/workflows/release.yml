@@ -5,8 +5,6 @@ on:
     workflows: ["Packaging"]
     types:
       - completed
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -48,13 +46,31 @@ jobs:
       - name: Organize artifacts
         run: |
           mkdir -p release
-          
-          # Find and copy DEB packages
-          find artifacts -name "*.deb" -exec cp {} release/ \;
-          
-          # Find and copy RPM packages
-          find artifacts -name "*.rpm" -exec cp {} release/ \;
-          
+
+          # Copy DEB packages, renaming to include distro
+          # Artifact dirs are like: artifacts/netleak-ubuntu-22.04.deb/netleak_1.0.0_amd64.deb
+          for dir in artifacts/netleak-*.deb; do
+            [ -d "$dir" ] || continue
+            distro=$(basename "$dir" | sed 's/^netleak-//;s/\.deb$//')
+            for file in "$dir"/*.deb; do
+              [ -f "$file" ] || continue
+              base=$(basename "$file" .deb)
+              cp "$file" "release/${base}_${distro}.deb"
+            done
+          done
+
+          # Copy RPM packages, renaming to include distro
+          # Artifact dirs are like: artifacts/netleak-fedora-40.rpm/netleak-1.0.0-1.fc40.x86_64.rpm
+          for dir in artifacts/netleak-*.rpm; do
+            [ -d "$dir" ] || continue
+            distro=$(basename "$dir" | sed 's/^netleak-//;s/\.rpm$//')
+            for file in "$dir"/*.rpm; do
+              [ -f "$file" ] || continue
+              base=$(basename "$file" .rpm)
+              cp "$file" "release/${base}_${distro}.rpm"
+            done
+          done
+
           ls -lah release/
 
       - name: Generate checksums
@@ -229,8 +245,8 @@ jobs:
           
           ### Native Packages
           
-          | Distribution | Package | Installation |
-          |-------------|---------|--------------|
+          | Distribution | Package |
+          |-------------|---------|
           RELEASE_NOTES_EOF
           
           # Add DEB packages
@@ -239,7 +255,7 @@ jobs:
               filename=$(basename "$deb")
               distro=$(echo "$filename" | grep -oE 'ubuntu-[0-9]+\.[0-9]+|debian-[0-9]+' || echo "")
               if [ -n "$distro" ]; then
-                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) | \`sudo dpkg -i ${filename}\` |" >> release_notes.md
+                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) |" >> release_notes.md
               fi
             fi
           done
@@ -250,7 +266,7 @@ jobs:
               filename=$(basename "$rpm")
               distro=$(echo "$filename" | grep -oE 'fedora-[0-9]+' || echo "")
               if [ -n "$distro" ]; then
-                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) | \`sudo rpm -i ${filename}\` |" >> release_notes.md
+                echo "| ${distro} | [\`${filename}\`](${RELEASE_URL}/${filename}) |" >> release_notes.md
               fi
             fi
           done
@@ -292,12 +308,12 @@ jobs:
           # Import the maintainer's public key
           gpg --keyserver keys.openpgp.org --recv-keys 3E1A1F401A1C47BC77D1705612D0D82387FC53B0
           
-          # Download a package and its signature
-          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb
-          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb.asc
+          # Download a package and its signature (example: Ubuntu 24.04)
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64_ubuntu-24.04.deb
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64_ubuntu-24.04.deb.asc
           
           # Verify the signature
-          gpg --verify netleak_${VERSION}_amd64.deb.asc netleak_${VERSION}_amd64.deb
+          gpg --verify netleak_${VERSION}_amd64_ubuntu-24.04.deb.asc netleak_${VERSION}_amd64_ubuntu-24.04.deb
           \`\`\`
           
           ### Verify Package Checksums
@@ -310,8 +326,8 @@ jobs:
           # Verify the signature on the checksums
           gpg --verify SHA256SUMS.asc SHA256SUMS
           
-          # Download a package (example)
-          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64.deb
+          # Download a package (example: Ubuntu 24.04)
+          curl -LO ${RELEASE_URL}/netleak_${VERSION}_amd64_ubuntu-24.04.deb
           
           # Verify the checksum
           sha256sum -c SHA256SUMS --ignore-missing
@@ -408,7 +424,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: netleak ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           body_path: ${{ steps.release_notes.outputs.notes_file }}
           draft: true
           prerelease: ${{ contains(steps.version.outputs.tag, '-') }}

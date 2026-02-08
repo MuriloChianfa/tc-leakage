@@ -18,7 +18,7 @@ all: cmd $(BPF_OBJS)
 	clang $(BPF_CFLAGS) -c $< -o $@
 
 cmd:
-	go build -C cmd -o ../$(TARGET)
+	go build -C cmd -buildvcs=false -o ../$(TARGET)
 
 clean:
 	rm -f $(BPF_OBJS)

@@ -26,12 +26,12 @@ Features:
 - Policy routing via firewall marks
 
 %install
-install -D -m 0755 %{_builddir}/../BUILDROOT/%{name}-%{version}-%{release}.x86_64/usr/bin/netleak \
+install -D -m 0755 %{_builddir}/netleak \
     %{buildroot}/usr/bin/netleak
-install -D -m 0644 %{_builddir}/../BUILDROOT/%{name}-%{version}-%{release}.x86_64/usr/lib/netleak/netleak.o \
+install -D -m 0644 %{_builddir}/netleak.o \
     %{buildroot}/usr/lib/netleak/netleak.o
-install -D -m 0644 LICENSE %{buildroot}%{_defaultdocdir}/%{name}/LICENSE
-install -D -m 0644 LICENSE-GPL %{buildroot}%{_defaultdocdir}/%{name}/LICENSE-GPL
+install -D -m 0644 %{_builddir}/LICENSE %{buildroot}%{_defaultdocdir}/%{name}/LICENSE
+install -D -m 0644 %{_builddir}/LICENSE-GPL %{buildroot}%{_defaultdocdir}/%{name}/LICENSE-GPL
 
 %files
 %license %{_defaultdocdir}/%{name}/LICENSE
@@ -59,6 +59,6 @@ if [ -d /sys/fs/cgroup/netleak ]; then
 fi
 
 %changelog
-* Sat Feb 08 2026 MuriloChianfa <murilo.chianfa@outlook.com> - 1.0.0
+* Sun Feb 08 2026 MuriloChianfa <murilo.chianfa@outlook.com> - 1.0.0
 - Release version 1.0.0
 - Initial RPM package

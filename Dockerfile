@@ -20,7 +20,7 @@ COPY . .
 RUN make all
 
 # Verify the build artifacts exist
-RUN file /src/netleak && file /src/bpf/netleak.o
+RUN test -x /src/netleak && test -f /src/bpf/netleak.o
 
 # =============================================================================
 # Stage 2: Minimal Runtime

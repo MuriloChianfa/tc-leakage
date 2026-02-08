@@ -12,10 +12,16 @@ import (
 	"github.com/cilium/ebpf/link"
 )
 
-const (
-	bpfObjPath = "bpf/netleak.o"
-	bpfPinPath = "/sys/fs/bpf"
-)
+const bpfPinPath = "/sys/fs/bpf"
+
+// bpfObjSearchPaths lists where to look for the compiled BPF object,
+// in priority order. The first path is the installed system location
+// used by .deb/.rpm packages; the second is the relative path used
+// during development.
+var bpfObjSearchPaths = []string{
+	"/usr/lib/netleak/netleak.o",
+	"bpf/netleak.o",
+}
 
 // policy matches struct policy in bpf/netleak.h.
 type policy struct {
@@ -39,11 +45,27 @@ func (o *bpfObjects) Close() {
 	o.CgroupPolicyMap.Close()
 }
 
+// findBPFObj returns the first path from bpfObjSearchPaths that exists
+// on disk. It checks the installed system path before the development path.
+func findBPFObj() (string, error) {
+	for _, p := range bpfObjSearchPaths {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("BPF object not found in any of %v", bpfObjSearchPaths)
+}
+
 // loadBPF reads the compiled BPF object from disk, loads it into the
 // kernel, and returns the resulting programs and map. The map is pinned
 // to bpffs so multiple netleak sessions share the same map.
 func loadBPF() (*bpfObjects, error) {
-	objData, err := os.ReadFile(bpfObjPath)
+	objPath, err := findBPFObj()
+	if err != nil {
+		return nil, err
+	}
+
+	objData, err := os.ReadFile(objPath)
 	if err != nil {
 		return nil, fmt.Errorf("read BPF object: %w", err)
 	}

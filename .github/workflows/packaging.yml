@@ -55,11 +55,16 @@ jobs:
           apt-get update
           apt-get install -y \
             git clang llvm libbpf-dev libelf-dev \
-            make golang ca-certificates \
+            make ca-certificates \
             dpkg-dev fakeroot
 
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Build
         run: make all
@@ -111,11 +116,16 @@ jobs:
         run: |
           dnf install -y \
             git clang llvm libbpf-devel elfutils-libelf-devel \
-            make golang ca-certificates \
+            make ca-certificates \
             rpm-build
 
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Build
         run: make all
@@ -123,11 +133,9 @@ jobs:
       - name: Setup RPM build tree
         run: |
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          mkdir -p ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/bin
-          mkdir -p ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/lib/netleak
-
-          cp netleak ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/bin/
-          cp bpf/netleak.o ~/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64/usr/lib/netleak/
+          cp netleak ~/rpmbuild/BUILD/
+          cp bpf/netleak.o ~/rpmbuild/BUILD/
+          cp LICENSE LICENSE-GPL ~/rpmbuild/BUILD/
 
       - name: Build RPM package
         run: |
@@ -138,8 +146,11 @@ jobs:
             --buildroot "$HOME/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64" \
             pkg/rpm/netleak.spec
 
+      - name: Copy RPM to workspace
+        run: find ~/rpmbuild/RPMS -name '*.rpm' -exec cp {} . \;
+
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v6
         with:
           name: netleak-${{ matrix.distro }}.rpm
-          path: ~/rpmbuild/RPMS/**/*.rpm
+          path: "*.rpm"
