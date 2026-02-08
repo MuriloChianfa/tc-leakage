@@ -112,7 +112,7 @@ paths-ignore:
 
 For issues with CodeQL analysis:
 
-1. Check the [Actions logs](../../actions)
-2. Review [Security alerts](../../security/code-scanning)
+1. Check the [Actions logs](https://github.com/MuriloChianfa/tc-leakage/actions)
+2. Review [Security alerts](https://github.com/MuriloChianfa/tc-leakage/security/code-scanning)
 3. Open an issue with the `security` label
 4. Contact repository maintainers

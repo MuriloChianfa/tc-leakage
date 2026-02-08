@@ -100,8 +100,8 @@ When we release a security fix:
 
 Published security advisories can be found at:
 
-- GitHub Security Advisories: https://github.com/MuriloChianfa/netleak/security/advisories
-- Release Notes: https://github.com/MuriloChianfa/netleak/releases
+- GitHub Security Advisories: https://github.com/MuriloChianfa/tc-leakage/security/advisories
+- Release Notes: https://github.com/MuriloChianfa/tc-leakage/releases
 
 ## Bug Bounty Program
 

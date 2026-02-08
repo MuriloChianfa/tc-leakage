@@ -43,7 +43,20 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Fix Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - name: Install Go 1.24
+        run: |
+          # Download and install Go 1.24.4
+          wget -q https://go.dev/dl/go1.24.4.linux-amd64.tar.gz
+          tar -C /usr/local -xzf go1.24.4.linux-amd64.tar.gz
+          rm go1.24.4.linux-amd64.tar.gz
+        
+      - name: Verify Go installation
+        run: /usr/local/go/bin/go version
 
       - name: Install dependencies (apt)
         if: matrix.pkg_manager == 'apt'
@@ -53,20 +66,20 @@ jobs:
           apt-get update
           apt-get install -y \
             clang llvm libbpf-dev libelf-dev \
-            make golang ca-certificates
+            make ca-certificates wget
 
       - name: Install dependencies (dnf)
         if: matrix.pkg_manager == 'dnf'
         run: |
           dnf install -y \
             clang llvm libbpf-devel elfutils-libelf-devel \
-            make golang ca-certificates
+            make ca-certificates wget tar gzip
 
       - name: Build BPF object
         run: make bpf/netleak.o
 
       - name: Build Go binary
-        run: make cmd
+        run: PATH=/usr/local/go/bin:$PATH make cmd
 
       - name: Verify artifacts
         run: |
@@ -77,7 +90,7 @@ jobs:
       - name: Run unit tests
         run: |
           cd tests/unit
-          go test -v ./...
+          PATH=/usr/local/go/bin:$PATH go test -v ./...
         continue-on-error: true
 
   lint:
@@ -86,7 +99,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
         uses: actions/setup-go@v5
