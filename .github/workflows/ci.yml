@@ -34,12 +34,12 @@ jobs:
             pkg_manager: dnf
 
     steps:
-      - name: Install git
+      - name: Install git and wget
         run: |
           if [ "${{ matrix.pkg_manager }}" = "apt" ]; then
-            apt-get update && apt-get install -y git
+            apt-get update && apt-get install -y git wget ca-certificates
           else
-            dnf install -y git
+            dnf install -y git wget ca-certificates
           fi
 
       - name: Checkout
@@ -66,14 +66,14 @@ jobs:
           apt-get update
           apt-get install -y \
             clang llvm libbpf-dev libelf-dev \
-            make ca-certificates wget
+            make
 
       - name: Install dependencies (dnf)
         if: matrix.pkg_manager == 'dnf'
         run: |
           dnf install -y \
             clang llvm libbpf-devel elfutils-libelf-devel \
-            make ca-certificates wget tar gzip
+            make
 
       - name: Build BPF object
         run: make bpf/netleak.o
