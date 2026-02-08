@@ -42,7 +42,7 @@ jobs:
           ./netleak 2>&1 || true
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: netleak-linux-amd64
           path: |
