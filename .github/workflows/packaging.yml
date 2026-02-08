@@ -59,7 +59,7 @@ jobs:
             dpkg-dev fakeroot
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build
         run: make all
@@ -115,7 +115,7 @@ jobs:
             rpm-build
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build
         run: make all
