@@ -26,7 +26,7 @@ assignees: ''
 <!-- e.g., 18.0.0 (run `clang --version`) -->
 
 **netleak Version:**
-<!-- e.g., 0.1.0, or commit hash if building from source -->
+<!-- e.g., 1.0.0, or commit hash if building from source -->
 
 **cgroup v2 Status:**
 <!-- Run: mount | grep cgroup2 -->

@@ -20,13 +20,13 @@ jobs:
         uses: actions/first-interaction@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
+          issue_message: |
             Welcome to netleak! Thanks for opening your first issue.
 
             Please make sure you've included all the relevant information (OS, kernel version, steps to reproduce). If this is a security vulnerability, please report it privately via email instead -- see our [Security Policy](https://github.com/MuriloChianfa/netleak/blob/main/.github/SECURITY.md).
 
             A maintainer will review your issue shortly.
-          pr-message: |
+          pr_message: |
             Welcome to netleak! Thanks for your first pull request.
 
             Please make sure you've read our [Contributing Guide](https://github.com/MuriloChianfa/netleak/blob/main/.github/CONTRIBUTING.md) and that all CI checks pass.
