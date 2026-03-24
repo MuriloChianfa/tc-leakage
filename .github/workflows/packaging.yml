@@ -93,7 +93,7 @@ jobs:
         run: dpkg-deb --info "netleak_${{ needs.version.outputs.version }}_amd64.deb"
 
       - name: Upload DEB artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: netleak-${{ matrix.distro }}.deb
           path: "*.deb"
@@ -150,7 +150,7 @@ jobs:
         run: find ~/rpmbuild/RPMS -name '*.rpm' -exec cp {} . \;
 
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: netleak-${{ matrix.distro }}.rpm
           path: "*.rpm"
