@@ -228,7 +228,7 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           REPO_URL="https://github.com/${{ github.repository }}"
           RELEASE_URL="${REPO_URL}/releases/download/${TAG}"
-          GHCR_IMAGE="ghcr.io/${{ github.repository }}"
+          GHCR_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
           
           cat > release_notes.md << 'RELEASE_NOTES_EOF'
           A proxychains-like tool at kernel level: route all traffic from a process (and its children) through an arbitrary network interface, with kill-switch semantics that drop packets instead of leaking when the interface goes down.
@@ -295,7 +295,7 @@ jobs:
           **Available tags:**
           - \`latest\` - Latest stable release
           - \`${VERSION}\` - This specific version
-          - \`${VERSION%.*}\` - Minor version (e.g., 1.2.x)
+          - \`${VERSION%.*}\` - Minor version (e.g., 1.x)
           - \`${VERSION%%.*}\` - Major version (e.g., 1.x.x)
           
           ## 🔒 Verification
@@ -333,14 +333,6 @@ jobs:
           sha256sum -c SHA256SUMS --ignore-missing
           \`\`\`
           
-          ### Verify Container Image
-          
-          \`\`\`bash
-          # Get the image digest
-          docker pull ${GHCR_IMAGE}:${VERSION}
-          docker inspect ${GHCR_IMAGE}:${VERSION} | grep -A 10 RepoDigests
-          \`\`\`
-          
           ## 📚 Quick Start
           
           After installation, use netleak to route process traffic through specific interfaces:
@@ -359,9 +351,6 @@ jobs:
           exit  # leave the netleak shell
           curl ifconfig.me  # shows your real IP
           \`\`\`
-          
-          **Kill-switch in action:**
-          When the target interface goes down, all packets from the process are dropped (no fallback to default route).
           
           ## 📖 Documentation
           
@@ -398,11 +387,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        run: echo "GHCR_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.GHCR_IMAGE }}
           tags: |
             type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
