@@ -1,0 +1,7 @@
+.ssh/*
+!.gitkeep
+**/*.qcow2
+**/*.iso
+**/*.img
+**/*.log
+**/*.log.*

@@ -1,0 +1,35 @@
+connections {
+    netleak-e2e {
+        local_addrs = {{ underlay_client_ip }}
+        remote_addrs = {{ underlay_server_ip }}
+
+        local {
+            auth = psk
+            id = client@netleak.e2e
+        }
+        remote {
+            auth = psk
+            id = server@netleak.e2e
+        }
+
+        children {
+            netleak-child {
+                local_ts = {{ tunnel_client_ip }}/24
+                remote_ts = {{ tunnel_server_ip }}/24
+                mode = tunnel
+                reqid = 42
+                start_action = start
+            }
+        }
+
+        version = 2
+    }
+}
+
+secrets {
+    ike-netleak {
+        id-server = server@netleak.e2e
+        id-client = client@netleak.e2e
+        secret = "netleak-e2e-psk-secret"
+    }
+}

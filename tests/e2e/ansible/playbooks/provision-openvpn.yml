@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+#
+# Provision OpenVPN tunnel between root namespace and vpn-server namespace.
+---
+- name: Provision OpenVPN tunnel
+  hosts: testvm
+  become: true
+
+  roles:
+    - openvpn

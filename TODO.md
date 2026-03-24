@@ -12,31 +12,31 @@
 
 ## v1.0.1 - Integration Testing (QEMU/KVM)
 
-- [ ] QEMU/KVM test harness
-  - [ ] VM boot scripts (QEMU launch with KVM auto-detection, TCG fallback)
-  - [ ] Alpine cloud image download and cloud-init seed ISO generation
-  - [ ] SSH-based VM access via user-mode networking port forward
-  - [ ] Ansible provisioning for declarative, idempotent VM configuration
-  - [ ] Shared test helpers and TAP-style output reporting
-- [ ] WireGuard integration test
-  - [ ] Ansible role: namespace + veth underlay, keypair generation, `wg0` tunnel
-  - [ ] Traffic routing verification (`netleak wg0 curl ...`)
-  - [ ] Kill-switch test (interface down -> traffic dropped)
-  - [ ] Recovery test (interface up -> traffic resumes)
-- [ ] OpenVPN integration test
-  - [ ] Ansible role: ephemeral PKI (CA + certs), TLS tunnel with `--dev tun`
-  - [ ] Traffic routing verification (`netleak tun0 curl ...`)
-  - [ ] Kill-switch and recovery validation
-- [ ] strongSwan/IPsec integration test
-  - [ ] Ansible role: IKEv2 with PSK, route-based VTI (`vti0` or `xfrm`) interface
-  - [ ] Traffic routing verification (`netleak vti0 curl ...`)
-  - [ ] Kill-switch and recovery validation
-- [ ] SoftEther VPN integration test
-  - [ ] Ansible role: SoftEther server with virtual hub, `tap0` bridge interface
-  - [ ] Traffic routing verification (`netleak tap0 curl ...`)
-  - [ ] Kill-switch and recovery validation (layer-2 tap device)
-- [ ] GitHub Actions CI workflow for e2e tests (TCG mode, parallel job matrix)
-- [ ] Test artifact collection and log upload
+- [x] QEMU/KVM test harness
+  - [x] VM boot scripts (QEMU launch with KVM auto-detection, TCG fallback)
+  - [x] Alpine cloud image download and cloud-init seed ISO generation
+  - [x] SSH-based VM access via user-mode networking port forward
+  - [x] Ansible provisioning for declarative, idempotent VM configuration
+  - [x] Shared test helpers and TAP-style output reporting
+- [x] WireGuard integration test
+  - [x] Ansible role: namespace + veth underlay, keypair generation, `wg0` tunnel
+  - [x] Traffic routing verification (`netleak wg0 curl ...`)
+  - [x] Kill-switch test (interface down -> traffic dropped)
+  - [x] Recovery test (interface up -> traffic resumes)
+- [x] OpenVPN integration test
+  - [x] Ansible role: ephemeral PKI (CA + certs), TLS tunnel with `--dev tun`
+  - [x] Traffic routing verification (`netleak tun0 curl ...`)
+  - [x] Kill-switch and recovery validation
+- [x] strongSwan/IPsec integration test
+  - [x] Ansible role: IKEv2 with PSK, route-based VTI (`vti0` or `xfrm`) interface
+  - [x] Traffic routing verification (`netleak vti0 curl ...`)
+  - [x] Kill-switch and recovery validation
+- [x] SoftEther VPN integration test
+  - [x] Ansible role: SoftEther server with virtual hub, `tap0` bridge interface
+  - [x] Traffic routing verification (`netleak tap0 curl ...`)
+  - [x] Kill-switch and recovery validation (layer-2 tap device)
+- [x] GitHub Actions CI workflow for e2e tests (TCG mode, parallel job matrix)
+- [x] Test artifact collection and log upload
 
 ## v1.1.0 - IPv6 and Multi-Interface
 

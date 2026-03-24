@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Configure SoftEther VPN server: create hub, user, and enable SecureNAT.
+set -euo pipefail
+
+VPNCMD="vpncmd localhost /SERVER /PASSWORD:"
+
+${VPNCMD} /CMD ServerPasswordSet ""
+${VPNCMD} /CMD HubCreate NETLEAK /PASSWORD:""
+${VPNCMD} /CMD Hub NETLEAK
+
+vpncmd localhost /SERVER /PASSWORD: /HUB:NETLEAK /CMD UserCreate testuser /GROUP:none /REALNAME:none /NOTE:none
+vpncmd localhost /SERVER /PASSWORD: /HUB:NETLEAK /CMD UserPasswordSet testuser /PASSWORD:testpass
+
+vpncmd localhost /SERVER /PASSWORD: /HUB:NETLEAK /CMD SecureNatEnable
+vpncmd localhost /SERVER /PASSWORD: /HUB:NETLEAK /CMD DhcpDisable
+
+# Configure the virtual host IP in the hub so it responds at tunnel_server_ip
+vpncmd localhost /SERVER /PASSWORD: /HUB:NETLEAK /CMD SecureNatHostSet /MAC:none /IP:{{ tunnel_server_ip }} /MASK:255.255.255.0
+
+# Create a local bridge to the server namespace's veth
+vpncmd localhost /SERVER /PASSWORD: /CMD BridgeCreate NETLEAK /DEVICE:veth-server /TAP:no 2>/dev/null || true

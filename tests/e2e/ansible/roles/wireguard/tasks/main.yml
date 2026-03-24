@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+---
+- name: Install WireGuard tools
+  apk:
+    name:
+      - wireguard-tools
+      - wireguard-tools-wg-quick
+    state: present
+
+- name: Generate server private key
+  ansible.builtin.shell: wg genkey
+  register: wg_server_privkey
+  changed_when: true
+
+- name: Derive server public key
+  ansible.builtin.shell: echo "{{ wg_server_privkey.stdout }}" | wg pubkey
+  register: wg_server_pubkey
+  changed_when: false
+
+- name: Generate client private key
+  ansible.builtin.shell: wg genkey
+  register: wg_client_privkey
+  changed_when: true
+
+- name: Derive client public key
+  ansible.builtin.shell: echo "{{ wg_client_privkey.stdout }}" | wg pubkey
+  register: wg_client_pubkey
+  changed_when: false
+
+- name: Create WireGuard server config
+  ansible.builtin.template:
+    src: wg-server.conf.j2
+    dest: /tmp/wg-server.conf
+    mode: "0600"
+
+- name: Create WireGuard client config
+  ansible.builtin.template:
+    src: wg-client.conf.j2
+    dest: /tmp/wg-client.conf
+    mode: "0600"
+
+- name: Set up WireGuard interface in server namespace
+  ansible.builtin.shell: |
+    ip netns exec {{ vpn_server_ns }} ip link add wg0 type wireguard
+    ip netns exec {{ vpn_server_ns }} wg setconf wg0 /tmp/wg-server.conf
+    ip netns exec {{ vpn_server_ns }} ip addr add {{ tunnel_server_ip }}/24 dev wg0
+    ip netns exec {{ vpn_server_ns }} ip link set wg0 up
+  args:
+    executable: /bin/bash
+
+- name: Set up WireGuard interface in client (root) namespace
+  ansible.builtin.shell: |
+    ip link add wg0 type wireguard
+    wg setconf wg0 /tmp/wg-client.conf
+    ip addr add {{ tunnel_client_ip }}/24 dev wg0
+    ip link set wg0 up
+  args:
+    executable: /bin/bash
+
+- name: Verify WireGuard tunnel connectivity
+  ansible.builtin.command:
+    cmd: ping -c 2 -W 3 {{ tunnel_server_ip }}
+  register: wg_ping
+  retries: 3
+  delay: 2
+  until: wg_ping.rc == 0
+
+- name: Start HTTP listener in server namespace
+  ansible.builtin.shell: |
+    ip netns exec {{ vpn_server_ns }} sh -c \
+      'cd /tmp && nohup python3 -m http.server {{ http_listen_port }} --bind 0.0.0.0 > /tmp/http.log 2>&1 &'
+  args:
+    executable: /bin/bash

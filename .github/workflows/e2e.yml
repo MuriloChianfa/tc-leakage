@@ -1,0 +1,79 @@
+name: E2E VPN Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: E2E (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - wireguard
+          - openvpn
+          - strongswan
+          - softether
+
+    env:
+      E2E_TIMEOUT: 300
+      E2E_QEMU_MEM: 2048
+      E2E_QEMU_CPUS: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang llvm libbpf-dev libelf-dev make \
+            qemu-system-x86 qemu-utils cloud-image-utils \
+            genisoimage openssh-client sshpass ansible
+
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd
+
+      - name: Verify build artifacts
+        run: |
+          test -x netleak
+          test -f bpf/netleak.o
+
+      - name: Download Alpine cloud image
+        run: make -C tests/e2e download-image
+
+      - name: Generate SSH key
+        run: make -C tests/e2e ssh-keygen
+
+      - name: Build cloud-init seed ISO
+        run: make -C tests/e2e build-seed-iso
+
+      - name: Run e2e scenario (${{ matrix.scenario }})
+        run: make -C tests/e2e run-${{ matrix.scenario }}
+        timeout-minutes: 10
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-logs-${{ matrix.scenario }}
+          path: tests/e2e/logs/
+          retention-days: 7

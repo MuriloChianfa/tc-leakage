@@ -1,0 +1,14 @@
+dev tun-server
+dev-type tun
+proto udp
+port 1194
+local {{ underlay_server_ip }}
+
+secret /tmp/ovpn-static.key 0
+ifconfig {{ tunnel_server_ip }} {{ tunnel_client_ip }}
+cipher AES-256-CBC
+
+keepalive 5 30
+persist-tun
+persist-key
+verb 3

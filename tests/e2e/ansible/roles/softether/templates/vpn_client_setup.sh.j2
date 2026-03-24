@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Configure SoftEther VPN bridge on client side to connect to server and
+# bridge to the local tap0 interface.
+set -euo pipefail
+
+VPNCMD="vpncmd localhost /CLIENT /PASSWORD:"
+
+${VPNCMD} /CMD NicCreate e2e 2>/dev/null || true
+
+${VPNCMD} /CMD AccountCreate netleak-conn \
+    /SERVER:{{ underlay_server_ip }}:443 \
+    /HUB:NETLEAK \
+    /USERNAME:testuser \
+    /NICNAME:e2e
+
+${VPNCMD} /CMD AccountPasswordSet netleak-conn /PASSWORD:testpass /TYPE:standard
+${VPNCMD} /CMD AccountConnect netleak-conn
+
+# Bridge the SoftEther virtual NIC to our tap0
+vpncmd localhost /CLIENT /PASSWORD: /CMD BridgeCreate netleak-conn /DEVICE:tap0 /TAP:no 2>/dev/null || true

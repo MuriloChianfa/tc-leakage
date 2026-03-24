@@ -1,0 +1,16 @@
+all:
+  hosts:
+    testvm:
+      ansible_host: 127.0.0.1
+      ansible_port: "{{ ssh_port | default(2222) }}"
+      ansible_user: root
+      ansible_ssh_private_key_file: "{{ ssh_key | default('.ssh/e2e_key') }}"
+      ansible_python_interpreter: /usr/bin/python3
+
+  vars:
+    vpn_server_ns: vpn-server
+    underlay_server_ip: 10.0.0.1
+    underlay_client_ip: 10.0.0.2
+    tunnel_server_ip: 10.10.0.1
+    tunnel_client_ip: 10.10.0.2
+    http_listen_port: 8080

@@ -1,0 +1,7 @@
+[Interface]
+PrivateKey = {{ wg_server_privkey.stdout }}
+ListenPort = 51820
+
+[Peer]
+PublicKey = {{ wg_client_pubkey.stdout }}
+AllowedIPs = {{ tunnel_client_ip }}/32

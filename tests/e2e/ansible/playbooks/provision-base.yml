@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+#
+# Base provisioning: install common packages, verify cgroup v2, set up
+# network namespace underlay shared by all VPN scenarios.
+---
+- name: Provision base environment
+  hosts: testvm
+  become: true
+
+  vars:
+    vpn_server_ns: vpn-server
+    underlay_server_ip: 10.0.0.1
+    underlay_client_ip: 10.0.0.2
+    http_listen_port: 8080
+    tunnel_server_ip: 10.10.0.1
+
+  tasks:
+    - name: Install base packages
+      apk:
+        name:
+          - iproute2
+          - curl
+          - python3
+          - iptables
+          - ip6tables
+          - bash
+          - coreutils
+          - util-linux
+          - mount
+        state: present
+        update_cache: true
+
+    - name: Ensure cgroup v2 is mounted
+      ansible.builtin.command:
+        cmd: mount -t cgroup2 cgroup2 /sys/fs/cgroup
+      register: cgroup_mount
+      failed_when: false
+      changed_when: cgroup_mount.rc == 0
+
+    - name: Verify cgroup v2 available
+      ansible.builtin.stat:
+        path: /sys/fs/cgroup/cgroup.controllers
+      register: cgv2
+      failed_when: not cgv2.stat.exists
+
+    - name: Enable BPF filesystem
+      ansible.builtin.command:
+        cmd: mount -t bpf bpf /sys/fs/bpf
+      register: bpf_mount
+      failed_when: false
+      changed_when: bpf_mount.rc == 0
+
+    - name: Verify netleak binary is present
+      ansible.builtin.stat:
+        path: /usr/local/bin/netleak
+      register: netleak_bin
+      failed_when: not netleak_bin.stat.exists
+
+    - name: Create VPN server network namespace
+      ansible.builtin.command:
+        cmd: ip netns add {{ vpn_server_ns }}
+      register: ns_add
+      failed_when: ns_add.rc != 0 and 'File exists' not in ns_add.stderr
+      changed_when: ns_add.rc == 0
+
+    - name: Create veth pair for underlay
+      ansible.builtin.shell: |
+        ip link add veth-client type veth peer name veth-server
+        ip link set veth-server netns {{ vpn_server_ns }}
+        ip addr add {{ underlay_client_ip }}/24 dev veth-client
+        ip link set veth-client up
+        ip netns exec {{ vpn_server_ns }} ip addr add {{ underlay_server_ip }}/24 dev veth-server
+        ip netns exec {{ vpn_server_ns }} ip link set veth-server up
+        ip netns exec {{ vpn_server_ns }} ip link set lo up
+      args:
+        executable: /bin/bash
+      register: veth_setup
+      failed_when: false
+      changed_when: veth_setup.rc == 0
+
+    - name: Create HTTP test page
+      ansible.builtin.shell: echo "netleak-e2e-ok" > /tmp/index.html
+      args:
+        executable: /bin/bash
+      changed_when: true

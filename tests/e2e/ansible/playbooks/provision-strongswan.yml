@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+#
+# Provision strongSwan/IPsec tunnel between root namespace and vpn-server namespace.
+---
+- name: Provision strongSwan IPsec tunnel
+  hosts: testvm
+  become: true
+
+  roles:
+    - strongswan

@@ -24,6 +24,21 @@ clean:
 	rm -f $(BPF_OBJS)
 	rm -f $(TARGET)
 
+e2e: all
+	$(MAKE) -C tests/e2e run-all
+
+e2e-wireguard: all
+	$(MAKE) -C tests/e2e run-wireguard
+
+e2e-openvpn: all
+	$(MAKE) -C tests/e2e run-openvpn
+
+e2e-strongswan: all
+	$(MAKE) -C tests/e2e run-strongswan
+
+e2e-softether: all
+	$(MAKE) -C tests/e2e run-softether
+
 show:
 	sudo bpftool prog show
 	sudo bpftool map list

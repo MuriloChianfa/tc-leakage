@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+---
+- name: Install OpenVPN
+  apk:
+    name:
+      - openvpn
+    state: present
+
+- name: Load TUN kernel module
+  ansible.builtin.shell: |
+    modprobe tun || true
+    mkdir -p /dev/net
+    [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
+    chmod 666 /dev/net/tun
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Generate static key
+  ansible.builtin.command:
+    cmd: openvpn --genkey secret /tmp/ovpn-static.key
+    creates: /tmp/ovpn-static.key
+
+- name: Create OpenVPN server config
+  ansible.builtin.template:
+    src: server.conf.j2
+    dest: /tmp/ovpn-server.conf
+    mode: "0600"
+
+- name: Create OpenVPN client config
+  ansible.builtin.template:
+    src: client.conf.j2
+    dest: /tmp/ovpn-client.conf
+    mode: "0600"
+
+- name: Start OpenVPN server in server namespace
+  ansible.builtin.shell: |
+    ip netns exec {{ vpn_server_ns }} openvpn \
+      --config /tmp/ovpn-server.conf \
+      --daemon --log /tmp/ovpn-server.log \
+      --writepid /tmp/ovpn-server.pid
+  args:
+    executable: /bin/bash
+
+- name: Wait for server to initialize
+  ansible.builtin.pause:
+    seconds: 3
+
+- name: Start OpenVPN client in root namespace
+  ansible.builtin.shell: |
+    openvpn --config /tmp/ovpn-client.conf \
+      --daemon --log /tmp/ovpn-client.log \
+      --writepid /tmp/ovpn-client.pid
+  args:
+    executable: /bin/bash
+
+- name: Wait for tunnel to establish
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Verify OpenVPN tunnel connectivity
+  ansible.builtin.command:
+    cmd: ping -c 2 -W 3 {{ tunnel_server_ip }}
+  register: ovpn_ping
+  retries: 5
+  delay: 3
+  until: ovpn_ping.rc == 0
+
+- name: Start HTTP listener in server namespace
+  ansible.builtin.shell: |
+    ip netns exec {{ vpn_server_ns }} sh -c \
+      'cd /tmp && nohup python3 -m http.server {{ http_listen_port }} --bind 0.0.0.0 > /tmp/http.log 2>&1 &'
+  args:
+    executable: /bin/bash
