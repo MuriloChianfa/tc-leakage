@@ -1,5 +1,14 @@
 <img src=".github/banner.png" align="center"></img>
 
+<p align="center">
+  <a href="https://github.com/MuriloChianfa/netleak/releases/latest"><img src="https://img.shields.io/github/v/release/MuriloChianfa/netleak?label=release" alt="Release"></a>
+  <a href="https://github.com/MuriloChianfa/netleak/actions/workflows/build.yml"><img src="https://github.com/MuriloChianfa/netleak/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/MuriloChianfa/netleak/actions/workflows/e2e.yml"><img src="https://github.com/MuriloChianfa/netleak/actions/workflows/e2e.yml/badge.svg" alt="E2E VPN Tests"></a>
+  <a href="https://github.com/MuriloChianfa/netleak/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MuriloChianfa/netleak" alt="License"></a>
+  <img src="https://img.shields.io/badge/platform-linux-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/go-1.24-00ADD8?logo=go&logoColor=white" alt="Go">
+</p>
+
 <p>
   A kernel-level, proxychains-like tool for per-process traffic redirection on Linux. Built on top of <strong>cgroup v2</strong> and <strong>eBPF</strong>, netleak forces all network traffic from a process and its entire child tree through a specific network interface, completely transparently to the application. A kernel-enforced <strong>kill-switch</strong> drops every packet instead of falling back to the default route, guaranteeing zero traffic leakage under any failure conditions.
 </p>
