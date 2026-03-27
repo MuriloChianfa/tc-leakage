@@ -45,6 +45,22 @@ e2e-strongswan: all
 e2e-softether: all
 	$(MAKE) -C tests/e2e run-softether
 
+bench: all
+	$(MAKE) -C tests/e2e bench-all
+	$(MAKE) -C tests/e2e aggregate-results
+
+bench-wireguard: all
+	$(MAKE) -C tests/e2e bench-wireguard
+
+bench-openvpn: all
+	$(MAKE) -C tests/e2e bench-openvpn
+
+bench-strongswan: all
+	$(MAKE) -C tests/e2e bench-strongswan
+
+bench-softether: all
+	$(MAKE) -C tests/e2e bench-softether
+
 show:
 	sudo bpftool prog show
 	sudo bpftool map list

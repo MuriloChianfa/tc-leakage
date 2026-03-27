@@ -1,0 +1,13 @@
+scenario,metric,baseline,netleak,delta_pct
+wireguard,throughput_single_mbps,4071,4035.66,-0.87
+wireguard,throughput_multi_mbps,3977.79,3983.46,0.14
+wireguard,latency_avg_ms,0.182,0.197,8.24
+openvpn,throughput_single_mbps,976.11,974.02,-0.21
+openvpn,throughput_multi_mbps,990.47,940.98,-5.00
+openvpn,latency_avg_ms,0.269,0.281,4.46
+strongswan,throughput_single_mbps,102671.16,101048.22,-1.58
+strongswan,throughput_multi_mbps,219787.38,206090.42,-6.23
+strongswan,latency_avg_ms,0.058,0.060,3.45
+softether,throughput_single_mbps,153098.98,149112.11,-2.60
+softether,throughput_multi_mbps,261896.81,267605.78,2.18
+softether,latency_avg_ms,0.043,0.046,6.98

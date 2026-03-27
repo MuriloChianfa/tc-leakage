@@ -1,0 +1,114 @@
+[
+  {
+    "scenario": "wireguard",
+    "interface": "wg0",
+    "arch": "x86_64",
+    "timestamp": "2026-03-27T03:48:39Z",
+    "config": {
+      "duration_s": 10,
+      "streams": 4,
+      "qemu_mem_mb": 2048,
+      "qemu_cpus": 2
+    },
+    "throughput_single": {
+      "baseline_mbps": 4071,
+      "netleak_mbps": 4035.66,
+      "delta_pct": -0.87
+    },
+    "throughput_multi": {
+      "streams": 4,
+      "baseline_mbps": 3977.79,
+      "netleak_mbps": 3983.46,
+      "delta_pct": 0.14
+    },
+    "latency": {
+      "baseline_avg_ms": 0.182,
+      "netleak_avg_ms": 0.197,
+      "delta_pct": 8.24
+    }
+  },
+  {
+    "scenario": "openvpn",
+    "interface": "tun0",
+    "arch": "x86_64",
+    "timestamp": "2026-03-27T03:51:18Z",
+    "config": {
+      "duration_s": 10,
+      "streams": 4,
+      "qemu_mem_mb": 2048,
+      "qemu_cpus": 2
+    },
+    "throughput_single": {
+      "baseline_mbps": 976.11,
+      "netleak_mbps": 974.02,
+      "delta_pct": -0.21
+    },
+    "throughput_multi": {
+      "streams": 4,
+      "baseline_mbps": 990.47,
+      "netleak_mbps": 940.98,
+      "delta_pct": -5.00
+    },
+    "latency": {
+      "baseline_avg_ms": 0.269,
+      "netleak_avg_ms": 0.281,
+      "delta_pct": 4.46
+    }
+  },
+  {
+    "scenario": "strongswan",
+    "interface": "vti0",
+    "arch": "x86_64",
+    "timestamp": "2026-03-27T03:53:31Z",
+    "config": {
+      "duration_s": 10,
+      "streams": 4,
+      "qemu_mem_mb": 2048,
+      "qemu_cpus": 2
+    },
+    "throughput_single": {
+      "baseline_mbps": 102671.16,
+      "netleak_mbps": 101048.22,
+      "delta_pct": -1.58
+    },
+    "throughput_multi": {
+      "streams": 4,
+      "baseline_mbps": 219787.38,
+      "netleak_mbps": 206090.42,
+      "delta_pct": -6.23
+    },
+    "latency": {
+      "baseline_avg_ms": 0.058,
+      "netleak_avg_ms": 0.060,
+      "delta_pct": 3.45
+    }
+  },
+  {
+    "scenario": "softether",
+    "interface": "tap0",
+    "arch": "x86_64",
+    "timestamp": "2026-03-27T03:55:47Z",
+    "config": {
+      "duration_s": 10,
+      "streams": 4,
+      "qemu_mem_mb": 2048,
+      "qemu_cpus": 2
+    },
+    "throughput_single": {
+      "baseline_mbps": 153098.98,
+      "netleak_mbps": 149112.11,
+      "delta_pct": -2.60
+    },
+    "throughput_multi": {
+      "streams": 4,
+      "baseline_mbps": 261896.81,
+      "netleak_mbps": 267605.78,
+      "delta_pct": 2.18
+    },
+    "latency": {
+      "baseline_avg_ms": 0.043,
+      "netleak_avg_ms": 0.046,
+      "delta_pct": 6.98
+    }
+  }
+]

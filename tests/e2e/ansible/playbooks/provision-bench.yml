@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+#
+# Benchmark provisioning: install iperf3 and jq, start an iperf3 server
+# inside the vpn-server namespace bound to the tunnel address.
+---
+- name: Provision benchmark tools
+  hosts: testvm
+  become: true
+
+  tasks:
+    - name: Install benchmark packages
+      apk:
+        name:
+          - iperf3
+          - jq
+        state: present
+        update_cache: true
+
+    - name: Stop any existing iperf3 server
+      ansible.builtin.shell: pkill iperf3 || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Start iperf3 server in vpn-server namespace (IPv4+IPv6)
+      ansible.builtin.shell: |
+        ip netns exec {{ vpn_server_ns }} \
+          iperf3 -s -D --bind {{ tunnel_server_ip }} -p 5201
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Verify iperf3 server is listening
+      ansible.builtin.shell: |
+        ip netns exec {{ vpn_server_ns }} ss -tlnp | grep 5201
+      args:
+        executable: /bin/bash
+      register: iperf3_check
+      retries: 3
+      delay: 1
+      until: iperf3_check.rc == 0

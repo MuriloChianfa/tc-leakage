@@ -1,0 +1,28 @@
+{
+  "scenario": "strongswan",
+  "interface": "vti0",
+  "arch": "x86_64",
+  "timestamp": "2026-03-27T03:53:31Z",
+  "config": {
+    "duration_s": 10,
+    "streams": 4,
+    "qemu_mem_mb": 2048,
+    "qemu_cpus": 2
+  },
+  "throughput_single": {
+    "baseline_mbps": 102671.16,
+    "netleak_mbps": 101048.22,
+    "delta_pct": -1.58
+  },
+  "throughput_multi": {
+    "streams": 4,
+    "baseline_mbps": 219787.38,
+    "netleak_mbps": 206090.42,
+    "delta_pct": -6.23
+  },
+  "latency": {
+    "baseline_avg_ms": 0.058,
+    "netleak_avg_ms": 0.060,
+    "delta_pct": 3.45
+  }
+}

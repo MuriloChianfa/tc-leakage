@@ -1,0 +1,28 @@
+{
+  "scenario": "softether",
+  "interface": "tap0",
+  "arch": "x86_64",
+  "timestamp": "2026-03-27T03:55:47Z",
+  "config": {
+    "duration_s": 10,
+    "streams": 4,
+    "qemu_mem_mb": 2048,
+    "qemu_cpus": 2
+  },
+  "throughput_single": {
+    "baseline_mbps": 153098.98,
+    "netleak_mbps": 149112.11,
+    "delta_pct": -2.60
+  },
+  "throughput_multi": {
+    "streams": 4,
+    "baseline_mbps": 261896.81,
+    "netleak_mbps": 267605.78,
+    "delta_pct": 2.18
+  },
+  "latency": {
+    "baseline_avg_ms": 0.043,
+    "netleak_avg_ms": 0.046,
+    "delta_pct": 6.98
+  }
+}

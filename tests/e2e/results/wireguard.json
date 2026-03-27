@@ -1,0 +1,28 @@
+{
+  "scenario": "wireguard",
+  "interface": "wg0",
+  "arch": "x86_64",
+  "timestamp": "2026-03-27T03:48:39Z",
+  "config": {
+    "duration_s": 10,
+    "streams": 4,
+    "qemu_mem_mb": 2048,
+    "qemu_cpus": 2
+  },
+  "throughput_single": {
+    "baseline_mbps": 4071,
+    "netleak_mbps": 4035.66,
+    "delta_pct": -0.87
+  },
+  "throughput_multi": {
+    "streams": 4,
+    "baseline_mbps": 3977.79,
+    "netleak_mbps": 3983.46,
+    "delta_pct": 0.14
+  },
+  "latency": {
+    "baseline_avg_ms": 0.182,
+    "netleak_avg_ms": 0.197,
+    "delta_pct": 8.24
+  }
+}

@@ -1,0 +1,137 @@
+name: VPN Throughput Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Benchmark (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - wireguard
+          - openvpn
+          - strongswan
+          - softether
+
+    env:
+      BENCH_TIMEOUT: 600
+      BENCH_QEMU_MEM: 2048
+      BENCH_QEMU_CPUS: 2
+      BENCH_DURATION: 10
+      BENCH_STREAMS: 4
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang llvm libbpf-dev libelf-dev make \
+            qemu-system-x86 qemu-utils cloud-image-utils \
+            genisoimage openssh-client sshpass ansible jq
+
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd
+
+      - name: Verify build artifacts
+        run: |
+          test -x netleak
+          test -f bpf/netleak.o
+
+      - name: Download Alpine cloud image
+        run: make -C tests/e2e download-image
+
+      - name: Generate SSH key
+        run: make -C tests/e2e ssh-keygen
+
+      - name: Build cloud-init seed ISO
+        run: make -C tests/e2e build-seed-iso
+
+      - name: Run benchmark (${{ matrix.scenario }})
+        run: make -C tests/e2e bench-${{ matrix.scenario }}
+        timeout-minutes: 15
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: bench-results-${{ matrix.scenario }}
+          path: tests/e2e/results/
+          retention-days: 30
+
+      - name: Upload benchmark logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: bench-logs-${{ matrix.scenario }}
+          path: tests/e2e/logs/
+          retention-days: 7
+
+  aggregate:
+    name: Aggregate Results
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install -r tests/e2e/requirements.txt
+
+      - name: Download all benchmark results
+        uses: actions/download-artifact@v6
+        with:
+          pattern: bench-results-*
+          path: tests/e2e/results-parts/
+
+      - name: Merge scenario results
+        run: |
+          mkdir -p tests/e2e/results
+          for dir in tests/e2e/results-parts/bench-results-*/; do
+            cp -v "${dir}"*.json tests/e2e/results/ 2>/dev/null || true
+          done
+          ls -la tests/e2e/results/
+
+      - name: Aggregate and check regressions
+        run: make -C tests/e2e aggregate-results
+        continue-on-error: true
+
+      - name: Generate charts
+        run: make -C tests/e2e charts
+        continue-on-error: true
+
+      - name: Upload aggregated results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: bench-results-aggregated
+          path: |
+            tests/e2e/results/results.json
+            tests/e2e/results/results.csv
+            tests/e2e/results/*.png
+          retention-days: 90

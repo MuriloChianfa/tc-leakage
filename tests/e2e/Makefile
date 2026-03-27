@@ -10,9 +10,11 @@ NETLEAK_BIN     := ../../netleak
 NETLEAK_BPF     := ../../bpf/netleak.o
 
 SCENARIOS := wireguard openvpn strongswan softether multi-interface
+BENCH_SCENARIOS := wireguard openvpn strongswan softether
 
 .PHONY: all download-image build-seed-iso ssh-keygen check-binary \
-        run-all $(addprefix run-,$(SCENARIOS)) clean
+        run-all $(addprefix run-,$(SCENARIOS)) \
+        bench-all $(addprefix bench-,$(BENCH_SCENARIOS)) aggregate-results charts clean
 
 all: run-all
 
@@ -64,6 +66,33 @@ run-all: check-binary $(ALPINE_IMAGE) seed.iso $(SSH_KEY)
 $(addprefix run-,$(SCENARIOS)): run-%: check-binary $(ALPINE_IMAGE) seed.iso $(SSH_KEY)
 	bash scripts/boot-vm.sh $(ALPINE_IMAGE) seed.iso $(SSH_KEY) $(SSH_PORT) $*
 
+bench-all: check-binary $(ALPINE_IMAGE) seed.iso $(SSH_KEY)
+	@failed=0; \
+	for scenario in $(BENCH_SCENARIOS); do \
+	  echo "========== Running benchmark: $$scenario =========="; \
+	  if ! bash scripts/boot-bench.sh $(ALPINE_IMAGE) seed.iso $(SSH_KEY) $(SSH_PORT) $$scenario; then \
+	    echo "FAIL: bench-$$scenario"; \
+	    failed=$$((failed + 1)); \
+	  else \
+	    echo "PASS: bench-$$scenario"; \
+	  fi; \
+	  echo; \
+	done; \
+	if [ $$failed -gt 0 ]; then \
+	  echo "$$failed benchmark(s) failed"; exit 1; \
+	fi; \
+	echo "All benchmarks completed"
+
+$(addprefix bench-,$(BENCH_SCENARIOS)): bench-%: check-binary $(ALPINE_IMAGE) seed.iso $(SSH_KEY)
+	bash scripts/boot-bench.sh $(ALPINE_IMAGE) seed.iso $(SSH_KEY) $(SSH_PORT) $*
+
+aggregate-results:
+	bash scripts/aggregate-results.sh
+	@$(MAKE) charts 2>/dev/null || echo "Chart generation skipped (install matplotlib: pip install -r requirements.txt)"
+
+charts:
+	python3 scripts/generate-charts.py
+
 clean:
 	rm -f $(ALPINE_IMAGE) seed.iso ../../netleak-static
-	rm -rf seed/ .ssh/ logs/
+	rm -rf seed/ .ssh/ logs/ results/

@@ -49,20 +49,20 @@
 
 ## v1.1.1 - VPN Throughput Benchmarks
 
-- [ ] Benchmark harness (QEMU/KVM, reuses e2e VM infrastructure, for both x86 and arm)
-  - [ ] `iperf3` server/client inside VPN tunnel namespaces
-  - [ ] Baseline measurement: `iperf3` direct through VPN interface (no netleak)
-  - [ ] Netleak measurement: `netleak <iface> iperf3 -c ...`
-  - [ ] Automated comparison and delta-percentage calculation
-- [ ] WireGuard (`wg0`) throughput benchmark
-- [ ] OpenVPN (`tun0`) throughput benchmark
-- [ ] strongSwan/IPsec (`vti0`) throughput benchmark
-- [ ] SoftEther (`tap0`) throughput benchmark
-- [ ] Latency benchmarks (RTT via `ping` with and without netleak)
-- [ ] Multi-stream benchmarks (parallel `iperf3` sessions)
-- [ ] Results output in machine-readable format (JSON/CSV)
-- [ ] CI job: run benchmarks and upload results as artifacts
-- [ ] Historical tracking: compare against previous runs to detect regressions
+- [x] Benchmark harness (QEMU/KVM, reuses e2e VM infrastructure, for both x86 and arm)
+  - [x] `iperf3` server/client inside VPN tunnel namespaces
+  - [x] Baseline measurement: `iperf3` direct through VPN interface (no netleak)
+  - [x] Netleak measurement: `netleak <iface> iperf3 -c ...`
+  - [x] Automated comparison and delta-percentage calculation
+- [x] WireGuard (`wg0`) throughput benchmark
+- [x] OpenVPN (`tun0`) throughput benchmark
+- [x] strongSwan/IPsec (`vti0`) throughput benchmark
+- [x] SoftEther (`tap0`) throughput benchmark
+- [x] Latency benchmarks (RTT via `ping` with and without netleak)
+- [x] Multi-stream benchmarks (parallel `iperf3` sessions)
+- [x] Results output in machine-readable format (JSON/CSV)
+- [x] CI job: run benchmarks and upload results as artifacts
+- [x] Historical tracking: compare against previous runs to detect regressions
 
 ## v1.2.0 - Daemon Mode
 
