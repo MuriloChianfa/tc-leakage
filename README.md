@@ -9,6 +9,13 @@
   <img src="https://img.shields.io/badge/go-1.24-00ADD8?logo=go&logoColor=white" alt="Go">
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/WireGuard-88171A?logo=wireguard&logoColor=white&style=for-the-badge" alt="WireGuard">
+  <img src="https://img.shields.io/badge/OpenVPN-EA7E20?logo=openvpn&logoColor=white&style=for-the-badge" alt="OpenVPN">
+  <img src="https://img.shields.io/badge/strongSwan-003399?style=for-the-badge" alt="strongSwan">
+  <img src="https://img.shields.io/badge/SoftEther-0095D5?style=for-the-badge" alt="SoftEther">
+</p>
+
 <p>
   A kernel-level, proxychains-like tool for per-process traffic redirection on Linux. Built on top of <strong>cgroup v2</strong> and <strong>eBPF</strong>, netleak forces all network traffic from a process and its entire child tree through a specific network interface, completely transparently to the application. A kernel-enforced <strong>kill-switch</strong> drops every packet instead of falling back to the default route, guaranteeing zero traffic leakage under any failure conditions.
 </p>
@@ -21,8 +28,8 @@
   Download the `.deb` package from the [latest release](https://github.com/MuriloChianfa/netleak/releases/latest) and install it:
 
   ```bash
-  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/netleak_1.0.0_amd64.deb
-  sudo dpkg -i netleak_1.0.0_amd64.deb
+  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.1.0/netleak_1.1.0_amd64.deb
+  sudo dpkg -i netleak_1.1.0_amd64.deb
   ```
 </details>
 <details name="install">
@@ -31,14 +38,14 @@
   Download the `.rpm` package from the [latest release](https://github.com/MuriloChianfa/netleak/releases/latest) and install it:
 
   ```bash
-  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.0.0/netleak-1.0.0-1.x86_64.rpm
-  sudo rpm -i netleak-1.0.0-1.x86_64.rpm
+  curl -LO https://github.com/MuriloChianfa/netleak/releases/download/v1.1.0/netleak-1.1.0-1.x86_64.rpm
+  sudo rpm -i netleak-1.1.0-1.x86_64.rpm
   ```
 </details>
 
 ## Or Build & Install from Source
 
-<details name="build-source" open>
+<details name="build-source">
   <summary style="font-size: 16px;"><strong>Ubuntu/Debian</strong></summary>
 
   ```bash
@@ -90,25 +97,10 @@ sudo netleak wg0 bash
 >
 > Everything launched from that shell (and its children*), will have traffic routed through `wg0`.
 
-<details>
-  <summary style="font-size: 16px;"><strong>Kill-switch for protecting unwanted leakage</strong></summary>
-  
-  When the target interface goes down:
-  - Userspace detects it via netlink subscription
-  - Sets `FLAG_KILL_SWITCH` in the BPF map entry
-  - The eBPF program drops all packets from the affected cgroup
-  - No fallback to the default route ever occurs
-
-  When the interface comes back up, the flag is cleared and traffic resumes.
-</details>
-
 ## Security
 
 For details on reporting vulnerabilities and our security practices, see the [Security Policy](https://github.com/MuriloChianfa/netleak/security/policy).
 
 ## License
 
-| Component | License | File |
-|---|---|---|
-| Go source | MIT | [LICENSE](LICENSE) |
-| eBPF/C source | GPL-3.0-only | [LICENSE-GPL](LICENSE-GPL) |
+The Go source code is licensed under MIT ([LICENSE](LICENSE)). The eBPF/C source code is licensed under GPL-3.0-only ([LICENSE-GPL](LICENSE-GPL)).

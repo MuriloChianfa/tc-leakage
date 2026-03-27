@@ -8,15 +8,6 @@
   hosts: testvm
   become: true
 
-  vars:
-    vpn_server_ns: vpn-server
-    underlay_server_ip: 10.0.0.1
-    underlay_client_ip: 10.0.0.2
-    http_listen_port: 8080
-    tunnel_server_ip: 10.10.0.1
-    tunnel_server_ip6: "fd10::1"
-    tunnel_client_ip6: "fd10::2"
-
   tasks:
     - name: Install base packages
       apk:

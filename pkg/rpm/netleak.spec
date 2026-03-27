@@ -1,5 +1,5 @@
 Name:           netleak
-Version:        %{?version}%{!?version:1.0.0}
+Version:        %{?version}%{!?version:1.1.0}
 Release:        %{?release}%{!?release:1}%{?dist}
 Summary:        cgroup-based eBPF per-process traffic redirection
 
@@ -59,6 +59,14 @@ if [ -d /sys/fs/cgroup/netleak ]; then
 fi
 
 %changelog
+* Thu Mar 26 2026 MuriloChianfa <murilo.chianfa@outlook.com> - 1.1.0
+- Release version 1.1.0
+- IPv6 policy routing support
+- Multiple interface support
+- Ingress filtering
+- Interface auto-detection by gateway or IP range
+- ARM64 and cross-compilation support
+
 * Sun Feb 08 2026 MuriloChianfa <murilo.chianfa@outlook.com> - 1.0.0
 - Release version 1.0.0
 - Initial RPM package
