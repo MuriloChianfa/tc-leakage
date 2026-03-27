@@ -73,11 +73,11 @@ wait_for_ssh() {
 }
 
 assert_curl_ok() {
-    local key="$1" port="$2" iface="$3" url="$4" desc="${5:-routing through ${iface}}"
+    local key="$1" port="$2" iface="$3" url="$4" desc="${5:-routing through ${iface}}" netleak_flags="${6:-}"
     local max_attempts=6
     local attempt
     for attempt in $(seq 1 "${max_attempts}"); do
-        if vm_ssh "${key}" "${port}" "netleak ${iface} curl -sf --connect-timeout 10 ${url}" 2>/dev/null; then
+        if vm_ssh "${key}" "${port}" "netleak ${netleak_flags} ${iface} curl -sf --connect-timeout 10 ${url}" 2>/dev/null; then
             tap_ok "${desc}"
             return
         fi
@@ -87,8 +87,8 @@ assert_curl_ok() {
 }
 
 assert_curl_fails() {
-    local key="$1" port="$2" iface="$3" url="$4" desc="${5:-kill-switch on ${iface}}"
-    if vm_ssh "${key}" "${port}" "netleak ${iface} curl -sf --connect-timeout 5 ${url}" 2>/dev/null; then
+    local key="$1" port="$2" iface="$3" url="$4" desc="${5:-kill-switch on ${iface}}" netleak_flags="${6:-}"
+    if vm_ssh "${key}" "${port}" "netleak ${netleak_flags} ${iface} curl -sf --connect-timeout 5 ${url}" 2>/dev/null; then
         tap_not_ok "${desc}"
     else
         tap_ok "${desc}"

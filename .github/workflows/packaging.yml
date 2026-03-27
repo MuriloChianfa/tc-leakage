@@ -29,7 +29,7 @@ jobs:
           echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
 
   deb:
-    name: DEB (${{ matrix.distro }})
+    name: DEB (${{ matrix.distro }}, ${{ matrix.goarch }})
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
     needs: version
@@ -40,12 +40,24 @@ jobs:
         include:
           - distro: ubuntu-22.04
             image: ubuntu:22.04
+            goarch: amd64
+            deb_arch: amd64
           - distro: ubuntu-24.04
             image: ubuntu:24.04
+            goarch: amd64
+            deb_arch: amd64
           - distro: debian-12
             image: debian:12
+            goarch: amd64
+            deb_arch: amd64
           - distro: debian-13
             image: debian:trixie
+            goarch: amd64
+            deb_arch: amd64
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+            goarch: arm64
+            deb_arch: arm64
 
     steps:
       - name: Install dependencies
@@ -66,12 +78,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
-        run: make all
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd GOARCH=${{ matrix.goarch }}
 
       - name: Build DEB package
         run: |
-          PKG_DIR="$(pwd)/netleak_${{ needs.version.outputs.version }}_amd64"
+          PKG_DIR="$(pwd)/netleak_${{ needs.version.outputs.version }}_${{ matrix.deb_arch }}"
           mkdir -p "${PKG_DIR}/usr/bin"
           mkdir -p "${PKG_DIR}/usr/lib/netleak"
           mkdir -p "${PKG_DIR}/DEBIAN"
@@ -79,8 +94,8 @@ jobs:
           cp netleak "${PKG_DIR}/usr/bin/"
           cp bpf/netleak.o "${PKG_DIR}/usr/lib/netleak/"
 
-          # Generate control file from template
-          sed "s/{{VERSION}}/${{ needs.version.outputs.version }}/g" \
+          sed -e "s/{{VERSION}}/${{ needs.version.outputs.version }}/g" \
+              -e "s/Architecture: amd64/Architecture: ${{ matrix.deb_arch }}/g" \
             pkg/deb/DEBIAN/control > "${PKG_DIR}/DEBIAN/control"
 
           cp pkg/deb/DEBIAN/postinst "${PKG_DIR}/DEBIAN/postinst"
@@ -90,16 +105,16 @@ jobs:
           dpkg-deb --build "${PKG_DIR}"
 
       - name: Verify DEB package
-        run: dpkg-deb --info "netleak_${{ needs.version.outputs.version }}_amd64.deb"
+        run: dpkg-deb --info "netleak_${{ needs.version.outputs.version }}_${{ matrix.deb_arch }}.deb"
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v7
         with:
-          name: netleak-${{ matrix.distro }}.deb
+          name: netleak-${{ matrix.distro }}-${{ matrix.deb_arch }}.deb
           path: "*.deb"
 
   rpm:
-    name: RPM (${{ matrix.distro }})
+    name: RPM (${{ matrix.distro }}, ${{ matrix.goarch }})
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
     needs: version
@@ -110,6 +125,12 @@ jobs:
         include:
           - distro: fedora-40
             image: fedora:40
+            goarch: amd64
+            rpm_arch: x86_64
+          - distro: fedora-40
+            image: fedora:40
+            goarch: arm64
+            rpm_arch: aarch64
 
     steps:
       - name: Install dependencies
@@ -127,8 +148,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
-        run: make all
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Build Go binary
+        run: make cmd GOARCH=${{ matrix.goarch }}
 
       - name: Setup RPM build tree
         run: |
@@ -140,10 +164,11 @@ jobs:
       - name: Build RPM package
         run: |
           rpmbuild -bb \
+            --target ${{ matrix.rpm_arch }} \
             --define "version ${{ needs.version.outputs.version }}" \
             --define "release 1" \
             --define "_topdir $HOME/rpmbuild" \
-            --buildroot "$HOME/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.x86_64" \
+            --buildroot "$HOME/rpmbuild/BUILDROOT/netleak-${{ needs.version.outputs.version }}-1.${{ matrix.rpm_arch }}" \
             pkg/rpm/netleak.spec
 
       - name: Copy RPM to workspace
@@ -152,5 +177,5 @@ jobs:
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v7
         with:
-          name: netleak-${{ matrix.distro }}.rpm
+          name: netleak-${{ matrix.distro }}-${{ matrix.rpm_arch }}.rpm
           path: "*.rpm"

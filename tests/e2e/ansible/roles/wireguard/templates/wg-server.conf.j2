@@ -4,4 +4,4 @@ ListenPort = 51820
 
 [Peer]
 PublicKey = {{ wg_client_pubkey.stdout }}
-AllowedIPs = {{ tunnel_client_ip }}/32
+AllowedIPs = {{ tunnel_client_ip }}/32, {{ tunnel_client_ip6 }}/128

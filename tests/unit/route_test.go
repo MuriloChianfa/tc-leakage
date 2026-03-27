@@ -4,38 +4,40 @@
 package unit
 
 import (
+	"net"
 	"testing"
 )
 
-// TestFwmarkNonZero verifies the fwmark is non-zero (required for policy routing).
-func TestFwmarkNonZero(t *testing.T) {
-	const fwmark = 0x4E4C
-
-	if fwmark == 0 {
-		t.Error("fwmark must be non-zero for policy routing to work")
-	}
-}
-
-// TestFwmarkFitsUint32 verifies the fwmark fits in a uint32 (kernel sk->mark size).
-func TestFwmarkFitsUint32(t *testing.T) {
-	const fwmark = 0x4E4C
-
-	if fwmark > 0xFFFFFFFF {
-		t.Errorf("fwmark = 0x%X exceeds uint32 max", fwmark)
-	}
-}
-
-// TestRouteTableInValidRange verifies the routing table ID is in the user-defined range.
-// Linux routing tables: 0 = unspec, 253 = default, 254 = main, 255 = local.
-// User tables should be in [1, 252].
-func TestRouteTableInValidRange(t *testing.T) {
-	const routeTable = 100
-
-	reserved := []int{0, 253, 254, 255}
-	for _, r := range reserved {
-		if routeTable == r {
-			t.Errorf("routeTable = %d conflicts with reserved table %d", routeTable, r)
+// TestAllocFwmarkFitsUint32 verifies allocated fwmarks fit in a uint32.
+func TestAllocFwmarkFitsUint32(t *testing.T) {
+	for _, idx := range []int{0, 1, 255, 65535} {
+		m := allocFwmark(idx)
+		if uint64(m) > 0xFFFFFFFF {
+			t.Errorf("allocFwmark(%d) = 0x%X exceeds uint32 max", idx, m)
 		}
+	}
+}
+
+// TestAllocRouteTableNoReservedConflict verifies no reserved table IDs are returned.
+func TestAllocRouteTableNoReservedConflict(t *testing.T) {
+	reserved := []int{0, 253, 254, 255}
+	for idx := 0; idx <= 500; idx++ {
+		tbl := allocRouteTable(idx)
+		for _, r := range reserved {
+			if tbl == r {
+				t.Errorf("allocRouteTable(%d) = %d conflicts with reserved table %d", idx, tbl, r)
+			}
+		}
+	}
+}
+
+// TestAllocDifferentInterfacesGetDifferentTables verifies distinct interfaces
+// get distinct routing tables.
+func TestAllocDifferentInterfacesGetDifferentTables(t *testing.T) {
+	t1 := allocRouteTable(1)
+	t2 := allocRouteTable(2)
+	if t1 == t2 {
+		t.Errorf("allocRouteTable(1) == allocRouteTable(2) == %d", t1)
 	}
 }
 
@@ -48,25 +50,24 @@ func TestFwmarkMask(t *testing.T) {
 	}
 }
 
-// TestPolicyStructLayout verifies the policy struct field layout matches BPF expectations.
-func TestPolicyStructLayout(t *testing.T) {
-	type policy struct {
-		Fwmark uint32
-		Flags  uint32
+// TestIPv4DefaultCIDR verifies 0.0.0.0/0 is parsed correctly.
+func TestIPv4DefaultCIDR(t *testing.T) {
+	_, dst, err := net.ParseCIDR("0.0.0.0/0")
+	if err != nil {
+		t.Fatalf("ParseCIDR(0.0.0.0/0): %v", err)
 	}
-
-	pol := policy{Fwmark: 0x4E4C, Flags: 0}
-
-	if pol.Fwmark != 0x4E4C {
-		t.Errorf("policy.Fwmark = 0x%X, want 0x4E4C", pol.Fwmark)
+	if dst.IP.To4() == nil {
+		t.Error("0.0.0.0/0 should be IPv4")
 	}
-	if pol.Flags != 0 {
-		t.Errorf("policy.Flags = %d, want 0", pol.Flags)
-	}
+}
 
-	// Test kill-switch flag
-	pol.Flags = 1 << 0
-	if pol.Flags != 1 {
-		t.Errorf("policy.Flags with kill-switch = %d, want 1", pol.Flags)
+// TestIPv6DefaultCIDR verifies ::/0 is parsed correctly.
+func TestIPv6DefaultCIDR(t *testing.T) {
+	_, dst, err := net.ParseCIDR("::/0")
+	if err != nil {
+		t.Fatalf("ParseCIDR(::/0): %v", err)
+	}
+	if dst.IP.To4() != nil {
+		t.Error("::/0 should not be IPv4")
 	}
 }

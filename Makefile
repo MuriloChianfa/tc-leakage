@@ -1,4 +1,10 @@
-ARCH_INCLUDES := /usr/include/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo x86_64-linux-gnu)
+GOARCH   ?= $(shell go env GOARCH)
+GOOS     ?= linux
+
+MULTIARCH := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || \
+               if [ "$(GOARCH)" = "arm64" ]; then echo aarch64-linux-gnu; \
+               else echo x86_64-linux-gnu; fi)
+ARCH_INCLUDES := /usr/include/$(MULTIARCH)
 
 BPF_CFLAGS := -O2 -g \
   -target bpf \
@@ -18,7 +24,7 @@ all: cmd $(BPF_OBJS)
 	clang $(BPF_CFLAGS) -c $< -o $@
 
 cmd:
-	go build -C cmd -buildvcs=false -o ../$(TARGET)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -C cmd -buildvcs=false -o ../$(TARGET)
 
 clean:
 	rm -f $(BPF_OBJS)

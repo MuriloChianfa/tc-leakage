@@ -6,6 +6,8 @@
 # =============================================================================
 FROM golang:1.25-bookworm AS builder
 
+ARG TARGETARCH
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     clang \
     llvm \
@@ -17,9 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY . .
 
-RUN make all
+RUN make bpf/netleak.o
+RUN make cmd GOARCH=${TARGETARCH:-amd64}
 
-# Verify the build artifacts exist
 RUN test -x /src/netleak && test -f /src/bpf/netleak.o
 
 # =============================================================================
@@ -32,7 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libelf1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install binary and BPF object
 COPY --from=builder /src/netleak /usr/bin/netleak
 COPY --from=builder /src/bpf/netleak.o /usr/lib/netleak/netleak.o
 

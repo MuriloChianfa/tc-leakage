@@ -9,8 +9,17 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.goarch }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            artifact_suffix: amd64
+          - goarch: arm64
+            artifact_suffix: arm64
 
     steps:
       - name: Checkout
@@ -32,19 +41,18 @@ jobs:
         run: make bpf/netleak.o
 
       - name: Build Go binary
-        run: make cmd
+        run: make cmd GOARCH=${{ matrix.goarch }}
 
       - name: Verify artifacts
         run: |
           ls -lh netleak bpf/netleak.o
           file netleak
           file bpf/netleak.o
-          ./netleak 2>&1 || true
 
       - name: Upload binary
         uses: actions/upload-artifact@v7
         with:
-          name: netleak-linux-amd64
+          name: netleak-linux-${{ matrix.artifact_suffix }}
           path: |
             netleak
             bpf/netleak.o

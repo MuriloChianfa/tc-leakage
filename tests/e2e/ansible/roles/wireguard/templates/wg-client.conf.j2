@@ -4,5 +4,5 @@ ListenPort = 51821
 
 [Peer]
 PublicKey = {{ wg_server_pubkey.stdout }}
-AllowedIPs = {{ tunnel_server_ip }}/32
+AllowedIPs = {{ tunnel_server_ip }}/32, {{ tunnel_server_ip6 }}/128
 Endpoint = {{ underlay_server_ip }}:51820

@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024-2026 MuriloChianfa
+#
+# Provision both WireGuard and OpenVPN tunnels for multi-interface isolation testing.
+# WireGuard uses 10.10.0.0/24, OpenVPN uses 10.20.0.0/24.
+---
+- name: Provision WireGuard tunnel (wg0)
+  hosts: testvm
+  become: true
+
+  vars:
+    tunnel_client_ip: "10.10.0.2"
+
+  roles:
+    - wireguard
+
+- name: Provision OpenVPN tunnel (tun0) on separate subnet
+  hosts: testvm
+  become: true
+
+  vars:
+    tunnel_server_ip: "10.20.0.1"
+    tunnel_client_ip: "10.20.0.2"
+
+  roles:
+    - openvpn
+
+- name: Start second HTTP listener on OpenVPN subnet
+  hosts: testvm
+  become: true
+
+  vars:
+    vpn_server_ns: vpn-server
+
+  tasks:
+    - name: Start HTTP listener on OpenVPN tunnel IP (port 8081)
+      ansible.builtin.shell: |
+        ip netns exec {{ vpn_server_ns }} sh -c \
+          'cd /tmp && nohup python3 -m http.server 8081 --bind 10.20.0.1 > /tmp/http-ovpn.log 2>&1 &'
+      args:
+        executable: /bin/bash

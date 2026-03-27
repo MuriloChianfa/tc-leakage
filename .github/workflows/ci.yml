@@ -93,6 +93,42 @@ jobs:
           PATH=/usr/local/go/bin:$PATH go test -v ./...
         continue-on-error: true
 
+  cross-compile:
+    name: Cross-compile (arm64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev libelf-dev make
+
+      - name: Build BPF object
+        run: make bpf/netleak.o
+
+      - name: Cross-compile Go binary for arm64
+        run: make cmd GOARCH=arm64
+
+      - name: Verify arm64 binary
+        run: |
+          file netleak | grep -q 'aarch64\|ARM aarch64'
+          echo "arm64 binary verified"
+
+      - name: Run unit tests (pure Go, host arch)
+        run: |
+          cd tests/unit
+          go test -v ./...
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

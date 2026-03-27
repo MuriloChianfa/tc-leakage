@@ -40,12 +40,12 @@
 
 ## v1.1.0 - IPv6 and Multi-Interface
 
-- [ ] IPv6 policy routing support
-- [ ] Multiple interface support (route different cgroups through different interfaces)
-- [ ] Ingress filtering (drop inbound traffic not from the target interface)
-- [ ] Interface auto-detection by gateway or IP range
-- [ ] Stable CLI and BPF map ABI
-- [ ] ARM64 and cross-compilation support
+- [x] IPv6 policy routing support
+- [x] Multiple interface support (route different cgroups through different interfaces)
+- [x] Ingress filtering (drop inbound traffic not from the target interface)
+- [x] Interface auto-detection by gateway or IP range
+- [x] Stable CLI and BPF map ABI
+- [x] ARM64 and cross-compilation support
 
 ## v1.1.1 - VPN Throughput Benchmarks
 

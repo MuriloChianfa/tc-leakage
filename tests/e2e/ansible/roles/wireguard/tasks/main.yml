@@ -45,6 +45,7 @@
     ip netns exec {{ vpn_server_ns }} ip link add wg0 type wireguard
     ip netns exec {{ vpn_server_ns }} wg setconf wg0 /tmp/wg-server.conf
     ip netns exec {{ vpn_server_ns }} ip addr add {{ tunnel_server_ip }}/24 dev wg0
+    ip netns exec {{ vpn_server_ns }} ip -6 addr add {{ tunnel_server_ip6 }}/64 dev wg0
     ip netns exec {{ vpn_server_ns }} ip link set wg0 up
   args:
     executable: /bin/bash
@@ -54,6 +55,7 @@
     ip link add wg0 type wireguard
     wg setconf wg0 /tmp/wg-client.conf
     ip addr add {{ tunnel_client_ip }}/24 dev wg0
+    ip -6 addr add {{ tunnel_client_ip6 }}/64 dev wg0
     ip link set wg0 up
   args:
     executable: /bin/bash
@@ -66,9 +68,9 @@
   delay: 2
   until: wg_ping.rc == 0
 
-- name: Start HTTP listener in server namespace
+- name: Start HTTP listener in server namespace (dual-stack)
   ansible.builtin.shell: |
     ip netns exec {{ vpn_server_ns }} sh -c \
-      'cd /tmp && nohup python3 -m http.server {{ http_listen_port }} --bind 0.0.0.0 > /tmp/http.log 2>&1 &'
+      'cd /tmp && nohup python3 -m http.server {{ http_listen_port }} --bind :: > /tmp/http.log 2>&1 &'
   args:
     executable: /bin/bash

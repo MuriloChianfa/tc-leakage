@@ -23,10 +23,12 @@ var bpfObjSearchPaths = []string{
 	"bpf/netleak.o",
 }
 
-// policy matches struct policy in bpf/netleak.h.
+// policy matches struct policy in bpf/netleak.h (16 bytes, stable ABI).
 type policy struct {
-	Fwmark uint32
-	Flags  uint32
+	Fwmark   uint32
+	Flags    uint32
+	Ifindex  uint32
+	Reserved uint32
 }
 
 const flagKillSwitch uint32 = 1 << 0
@@ -35,6 +37,7 @@ const flagKillSwitch uint32 = 1 << 0
 type bpfObjects struct {
 	NetleakSockCreate *ebpf.Program `ebpf:"netleak_sock_create"`
 	NetleakEgress     *ebpf.Program `ebpf:"netleak_egress"`
+	NetleakIngress    *ebpf.Program `ebpf:"netleak_ingress"`
 	CgroupPolicyMap   *ebpf.Map     `ebpf:"cgroup_policy_map"`
 }
 
@@ -42,6 +45,7 @@ type bpfObjects struct {
 func (o *bpfObjects) Close() {
 	o.NetleakSockCreate.Close()
 	o.NetleakEgress.Close()
+	o.NetleakIngress.Close()
 	o.CgroupPolicyMap.Close()
 }
 
@@ -85,19 +89,20 @@ func loadBPF() (*bpfObjects, error) {
 	return &objs, nil
 }
 
-// attachBPF attaches both BPF programs to the given cgroup path:
+// attachBPF attaches BPF programs to the given cgroup path:
 //   - sock_create: sets sk->sk_mark on new sockets (steers routing)
 //   - skb/egress:  kill-switch enforcement (drops packets when interface is down)
+//   - skb/ingress: ingress filtering (only when ingressFilter is true)
 //
 // The returned links must be closed to detach.
-func attachBPF(objs *bpfObjects, cgPath string) (sockLink link.Link, egressLink link.Link, err error) {
+func attachBPF(objs *bpfObjects, cgPath string, ingressFilter bool) (sockLink link.Link, egressLink link.Link, ingressLink link.Link, err error) {
 	sockLink, err = link.AttachCgroup(link.CgroupOptions{
 		Path:    cgPath,
 		Attach:  ebpf.AttachCGroupInetSockCreate,
 		Program: objs.NetleakSockCreate,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("attach sock_create: %w", err)
+		return nil, nil, nil, fmt.Errorf("attach sock_create: %w", err)
 	}
 
 	egressLink, err = link.AttachCgroup(link.CgroupOptions{
@@ -107,8 +112,21 @@ func attachBPF(objs *bpfObjects, cgPath string) (sockLink link.Link, egressLink 
 	})
 	if err != nil {
 		sockLink.Close()
-		return nil, nil, fmt.Errorf("attach egress: %w", err)
+		return nil, nil, nil, fmt.Errorf("attach egress: %w", err)
 	}
 
-	return sockLink, egressLink, nil
+	if ingressFilter {
+		ingressLink, err = link.AttachCgroup(link.CgroupOptions{
+			Path:    cgPath,
+			Attach:  ebpf.AttachCGroupInetIngress,
+			Program: objs.NetleakIngress,
+		})
+		if err != nil {
+			sockLink.Close()
+			egressLink.Close()
+			return nil, nil, nil, fmt.Errorf("attach ingress: %w", err)
+		}
+	}
+
+	return sockLink, egressLink, ingressLink, nil
 }

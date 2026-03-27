@@ -45,4 +45,27 @@ int netleak_egress(struct __sk_buff *skb) {
   return 1; /* allow */
 }
 
+/*
+ * cgroup_skb/ingress program.
+ *
+ * Drops inbound packets that did not arrive through the target interface.
+ * Also enforces the kill-switch on inbound traffic.
+ */
+SEC("cgroup_skb/ingress")
+int netleak_ingress(struct __sk_buff *skb) {
+  __u64 cgid = bpf_get_current_cgroup_id();
+
+  struct policy *pol = bpf_map_lookup_elem(&cgroup_policy_map, &cgid);
+  if (!pol)
+    return 1; /* no policy -> allow */
+
+  if (pol->flags & FLAG_KILL_SWITCH)
+    return 0; /* interface down -> drop */
+
+  if (pol->ifindex && skb->ingress_ifindex != pol->ifindex)
+    return 0; /* wrong interface -> drop */
+
+  return 1; /* allow */
+}
+
 char _license[] SEC("license") = "GPL";

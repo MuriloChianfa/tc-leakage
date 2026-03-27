@@ -14,7 +14,7 @@ import (
 // monitorInterface watches the target interface via netlink and toggles
 // the kill-switch flag in the BPF map when the interface goes up or down.
 // It blocks until ctx is cancelled.
-func monitorInterface(ctx context.Context, ifaceName string, m *ebpf.Map, cgID uint64) {
+func monitorInterface(ctx context.Context, ifaceName string, m *ebpf.Map, cgID uint64, mark uint32, ifindex uint32) {
 	updates := make(chan netlink.LinkUpdate)
 	done := make(chan struct{})
 	if err := netlink.LinkSubscribe(updates, done); err != nil {
@@ -40,7 +40,7 @@ func monitorInterface(ctx context.Context, ifaceName string, m *ebpf.Map, cgID u
 				log.Printf("Interface %s came up — kill-switch OFF", ifaceName)
 			}
 
-			pol := policy{Fwmark: uint32(fwmark), Flags: flags}
+			pol := policy{Fwmark: mark, Flags: flags, Ifindex: ifindex}
 			if err := m.Put(cgID, pol); err != nil {
 				log.Printf("Warning: kill-switch update failed: %v", err)
 			}

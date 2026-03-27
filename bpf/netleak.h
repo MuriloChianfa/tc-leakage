@@ -11,10 +11,12 @@
 /* Policy flags */
 #define FLAG_KILL_SWITCH (1 << 0)
 
-/* Per-cgroup routing policy */
+/* Per-cgroup routing policy (16 bytes, stable ABI) */
 struct policy {
-  __u32 fwmark; /* mark applied to skb (non-zero) */
-  __u32 flags;  /* bitmask: FLAG_KILL_SWITCH, etc. */
+  __u32 fwmark;    /* mark applied to skb (non-zero) */
+  __u32 flags;     /* bitmask: FLAG_KILL_SWITCH, etc. */
+  __u32 ifindex;   /* target interface index (for ingress filtering) */
+  __u32 _reserved; /* pad to 16 bytes, future use */
 };
 
 /*
