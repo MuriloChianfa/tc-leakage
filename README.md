@@ -103,4 +103,6 @@ For details on reporting vulnerabilities and our security practices, see the [Se
 
 ## License
 
-The Go source code is licensed under MIT ([LICENSE](LICENSE)). The eBPF/C source code is licensed under GPL-3.0-only ([LICENSE-GPL](LICENSE-GPL)).
+The eBPF/C source code is licensed under GPL-3.0-only ([LICENSE-GPL](LICENSE-GPL)).
+
+The Go source code is licensed under MIT ([LICENSE](LICENSE)).
