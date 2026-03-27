@@ -56,6 +56,7 @@
     wg setconf wg0 /tmp/wg-client.conf
     ip addr add {{ tunnel_client_ip }}/24 dev wg0
     ip -6 addr add {{ tunnel_client_ip6 }}/64 dev wg0
+    sysctl -w net.ipv6.conf.wg0.keep_addr_on_down=1
     ip link set wg0 up
   args:
     executable: /bin/bash
